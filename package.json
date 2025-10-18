@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "TikTok data retrieval API on Vercel",
   "type": "module",
-<<<<<<< HEAD
   "main": "api/tiktok.js",
   "scripts": {
     "dev": "node server.js",
@@ -11,28 +10,15 @@
     "build": "echo 'Build successful'",
     "test": "node --version && echo 'Tests passed'",
     "lint": "echo 'Lint passed'"
-=======
-  "scripts": {
-    "dev": "node server.js",
-    "deploy": "vercel --prod"
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
   },
   "dependencies": {
     "@sparticuz/chromium": "^123.0.1",
     "express": "^5.1.0",
     "playwright-core": "^1.42.0",
-<<<<<<< HEAD
     "puppeteer-core": "^21.6.1",
     "puppeteer": "^21.6.1"
-=======
-    "puppeteer-core": "^21.6.1"
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
   },
   "engines": {
     "node": ">=18.x"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
