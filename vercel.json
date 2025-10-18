@@ -1,17 +1,4 @@
-{ 
-    "version": 2,
-    "builds": [
-        {
-            "src": "api/tiktok.js",
-            "use": "@vercel/node"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "api/tiktok.js"
-        }
-    ],
+{
     "functions": {
         "api/tiktok.js": {
             "memory": 3008,

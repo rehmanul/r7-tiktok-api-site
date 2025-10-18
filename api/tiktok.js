@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   try {
     // Extract parameters
-    const { username, page = 1, 'per-page': perPage = 10, start_epoch, end_epoch } = req.query;
+    const { username, page: pageParam = 1, 'per-page': perPage = 10, start_epoch, end_epoch } = req.query;
 
     // Validate required parameters
     if (!username) {
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     }
 
     // Validate pagination parameters
-    const pageNum = parseInt(page);
+    const pageNum = parseInt(pageParam);
     const perPageNum = Math.min(parseInt(perPage), 100);
 
     if (pageNum < 1 || perPageNum < 1) {
