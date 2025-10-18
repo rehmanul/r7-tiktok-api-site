@@ -1,15 +1,8 @@
 {
-    "version": 2,
-    "builds": [
+    "rewrites": [
         {
-            "src": "api/tiktok.js",
-            "use": "@vercel/node"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/(.*)",
-            "dest": "api/tiktok.js"
+            "source": "/(.*)",
+            "destination": "/api/tiktok"
         }
     ],
     "functions": {
