@@ -40,6 +40,25 @@ Files changed by automation:
 - `.github/workflows/ci.yml` (CI)
 - `tests/test_repo_smoke.py` (basic smoke tests)
 
+Vercel Deployment
+-----------------
+
+This project can be deployed to Vercel using the Python runtime. A small wrapper is provided at `api/index.py` which exposes the FastAPI `app` to Vercel.
+
+Steps to deploy to Vercel:
+
+1. Sign in to Vercel and create a new project connected to this GitHub repository.
+2. Ensure `requirements.txt` is present (it is in the repo). Vercel will install dependencies from this file.
+3. In the Vercel project settings, add environment variables (do NOT put secrets in the repository):
+   - `ENSEMBLEDATA_TOKEN` — your token
+   - `REDIS_HOST`, `REDIS_PORT`, etc., as needed
+4. Deploy. The `vercel.json` config routes all requests to `api/index.py` which serves the FastAPI app.
+
+Notes:
+- Serverless functions on Vercel have execution time limits. For long-running EnsembleData fetches or high-concurrency workloads consider deploying to a container platform (K8s) or using Vercel's Advanced/Enterprise options.
+- Local redis/postgres are not available on Vercel; use managed services and set the connection strings in the environment.
+
+
 Next steps / Recommendations:
 
 - Rotate any exposed secrets immediately.
