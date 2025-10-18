@@ -1,0 +1,12 @@
+9c520ea refactor: minimal dependency TikTok client and docs
+0f93b4a feat: rebuild tiktok posts endpoint with cookie-based scraping
+6b520de fix: clean vercel config and parser tests
+6c4eb6a chore(tests): add test runner script, CI workflow, ignore local cookies and venv
+2cc8fb9 feat(parser): harden TikTok parser, add retries/backoff, throttling, proxy rotation; add unit tests and Vercel deploy workflow
+7a5f76d feat(ui): add advanced management SPA at /manage; remove cache/db services
+c922531 chore: remove caching/db services; add management UI; adjust docs for live-data cookie-based mode
+a57e647 chore: switch from EnsembleData to cookie-based TikTok client; update docs and env examples
+f82827d feat: replace EnsembleData with cookie-based TikTok fetch; add per-request cookie support
+cc2a557 chore: trim requirements for Vercel-friendly build
+be19e0a ci: add Vercel deployment config, requirements.txt and wrapper for FastAPI
+65bc1d3 hardening: production readiness  env-driven config, non-root Dockerfile, compose security, logging, dockerignore, CI and tests
