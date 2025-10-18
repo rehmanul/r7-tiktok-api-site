@@ -476,36 +476,130 @@ async def manage_ui():
         <html>
             <head>
                 <meta charset='utf-8'/>
-                <title>TikTok API - Manage</title>
+                <title>TikTok API - Management Console</title>
+                <meta name="viewport" content="width=device-width,initial-scale=1" />
                 <style>
-                    body{font-family: Arial, sans-serif; margin:40px}
-                    input, button {padding:8px; margin:4px}
-                    pre {background:#f6f8fa;padding:12px;border-radius:6px}
+                    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#06b6d4}
+                    body{font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,#071024,#07182a);color:#e6eef6;margin:0;padding:24px}
+                    .container{max-width:1100px;margin:0 auto}
+                    h1{margin:0 0 12px}
+                    .controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+                    input, select, button, textarea{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:#e6eef6}
+                    button{background:var(--accent);border:none;color:#04202a;font-weight:600}
+                    .row{display:flex;gap:12px;align-items:center}
+                    .meta{margin:8px 0;color:var(--muted)}
+                    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+                    .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 4px 18px rgba(2,6,23,0.6)}
+                    .card a{color:var(--accent);text-decoration:none}
+                    .stat{font-size:12px;color:var(--muted)}
+                    pre{white-space:pre-wrap;background:#00121a;padding:12px;border-radius:8px;color:#c9e9f2}
+                    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
                 </style>
             </head>
             <body>
-                <h1>TikTok API — Management UI</h1>
-                <p>Enter a username and optional cookie to fetch live posts.</p>
-                <div>
-                    <input id='username' placeholder='username' />
-                    <input id='cookie' placeholder='optional cookie (s_v_web_id=...; ...)'/>
-                    <button onclick='fetchPosts()'>Fetch</button>
+                <div class="container">
+                    <h1>TikTok API — Management Console</h1>
+                    <div class="meta">Live-data mode — no cache, no DB. Use a cookie if content is gated. Management UI supports history, CSV export and raw JSON.</div>
+
+                    <div class="controls">
+                        <input id="apiKey" placeholder="API Key (e.g. prod_key_001)" style="width:220px" />
+                        <input id="username" placeholder="username (without @)" style="width:220px" />
+                        <select id="perPage"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option></select>
+                        <input id="cookie" placeholder="Optional cookie (s_v_web_id=...; ...)" style="min-width:300px" />
+                        <button id="fetchBtn">Fetch Posts</button>
+                        <button id="exportBtn">Export CSV</button>
+                        <button id="clearHistory">Clear History</button>
+                    </div>
+
+                    <div class="toolbar">
+                        <div id="status" class="stat">Ready</div>
+                        <div id="rate" class="stat"></div>
+                        <div id="last" class="stat"></div>
+                    </div>
+
+                    <div id="cards" class="cards" style="margin-top:16px"></div>
+
+                    <h3 style="margin-top:18px">Raw JSON</h3>
+                    <pre id="raw">No data</pre>
                 </div>
-                <div>
-                    <h3>Result</h3>
-                    <pre id='result'>No data</pre>
-                </div>
+
                 <script>
-                    async function fetchPosts(){
-                        const u=document.getElementById('username').value;
-                        const c=document.getElementById('cookie').value;
+                    // Manage local state
+                    const apiKeyEl = document.getElementById('apiKey');
+                    const usernameEl = document.getElementById('username');
+                    const cookieEl = document.getElementById('cookie');
+                    const perPageEl = document.getElementById('perPage');
+                    const fetchBtn = document.getElementById('fetchBtn');
+                    const exportBtn = document.getElementById('exportBtn');
+                    const cards = document.getElementById('cards');
+                    const raw = document.getElementById('raw');
+                    const status = document.getElementById('status');
+                    const rate = document.getElementById('rate');
+                    const last = document.getElementById('last');
+
+                    // Load saved api key
+                    apiKeyEl.value = localStorage.getItem('tt_api_key') || 'prod_key_001';
+
+                    fetchBtn.onclick = async ()=>{
+                        const u = usernameEl.value.trim();
                         if(!u){alert('enter username');return}
-                        const headers={'X-API-Key':'prod_key_001'};
-                        if(c) headers['X-TikTok-Cookie']=c;
-                        const res=await fetch(`/v1/tiktok/posts?username=${encodeURIComponent(u)}`,{headers});
-                        const data=await res.json();
-                        document.getElementById('result').textContent=JSON.stringify(data,null,2);
+                        const key = apiKeyEl.value.trim();
+                        const cookie = cookieEl.value.trim();
+                        localStorage.setItem('tt_api_key', key);
+                        status.textContent = 'Fetching...';
+                        cards.innerHTML = '';
+
+                        try{
+                            const headers = {'X-API-Key': key};
+                            if(cookie) headers['X-TikTok-Cookie'] = cookie;
+                            const per = perPageEl.value;
+                            const res = await fetch(`/v1/tiktok/posts?username=${encodeURIComponent(u)}&per_page=${per}` , {headers});
+                            const data = await res.json();
+                            last.textContent = new Date().toLocaleString();
+                            raw.textContent = JSON.stringify(data, null, 2);
+                            status.textContent = res.ok ? 'Success' : ('Error: ' + (data.detail || res.status));
+                            rate.textContent = res.headers.get('X-RateLimit-Remaining') ? ('Rate remaining: '+res.headers.get('X-RateLimit-Remaining')) : '';
+                            renderCards(data.data || []);
+                            saveHistory(u, cookie);
+                        }catch(e){
+                            status.textContent = 'Fetch error';
+                            raw.textContent = String(e);
+                        }
                     }
+
+                    function renderCards(items){
+                        if(!items || items.length === 0){ cards.innerHTML = '<div class="stat">No posts found</div>'; return }
+                        cards.innerHTML = items.map(p=>cardHtml(p)).join('\n');
+                    }
+
+                    function cardHtml(p){
+                        const time = p.epoch_time_posted ? (new Date(p.epoch_time_posted*1000).toLocaleString()) : '';
+                        return `\n              <div class="card">\n                <div style="display:flex;gap:8px;align-items:flex-start">\n                  <div style="flex:1">\n                    <div><a href="${p.url}" target="_blank">${escapeHtml(p.description || p.url)}</a></div>\n                    <div class="stat">${time} • views:${p.views} likes:${p.likes} comments:${p.comments} shares:${p.shares}</div>\n                  </div>\n                </div>\n              </div>`;
+                    }
+
+                    function escapeHtml(s){ return (s||'').replace(/[&<>\"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+                    function saveHistory(username, cookie){
+                        const h = JSON.parse(localStorage.getItem('tt_history')||'[]');
+                        h.unshift({username, cookie, when:Date.now()});
+                        localStorage.setItem('tt_history', JSON.stringify(h.slice(0,30)));
+                    }
+
+                    exportBtn.onclick = ()=>{
+                        const text = raw.textContent || '{}';
+                        try{
+                            const obj=JSON.parse(text);
+                            const rows = (obj.data||[]).map(d=>[d.video_id, d.url, d.description.replace(/\n/g,' '), d.epoch_time_posted, d.views, d.likes, d.comments, d.shares]);
+                            const csv = ['video_id,url,description,epoch,views,likes,comments,shares', ...rows.map(r=>r.map(escapeCsv).join(','))].join('\n');
+                            const blob = new Blob([csv], {type:'text/csv'});
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a'); a.href=url; a.download='tiktok_posts.csv'; a.click(); URL.revokeObjectURL(url);
+                        }catch(e){ alert('No JSON to export') }
+                    }
+
+                    function escapeCsv(v){ if(v==null) return ''; return '"'+String(v).replace(/"/g,'""')+'"'; }
+
+                    document.getElementById('clearHistory').onclick = ()=>{ localStorage.removeItem('tt_history'); alert('History cleared') }
                 </script>
             </body>
         </html>
