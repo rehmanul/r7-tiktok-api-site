@@ -146,7 +146,7 @@ Anyone can then:
 
 2. Configure:
    cp .env.production.example .env.production
-   nano .env.production  # Add ENSEMBLEDATA_TOKEN
+  nano .env.production  # Add TIKTOK_COOKIE (optional)
 
 3. Deploy:
    ./deploy.sh
@@ -179,7 +179,7 @@ The following are EXCLUDED from Git (in .gitignore):
   ✗ __pycache__/ (Python cache)
 
 Users must add their own:
-  • ENSEMBLEDATA_TOKEN in .env.production
+  • TIKTOK_COOKIE in .env.production (optional)
   • API keys in production_api_real.py (or database)
   • SSL certificates in nginx/ssl/ (for HTTPS)
 

@@ -1,6 +1,6 @@
 """
 PRODUCTION TIKTOK API - ENTERPRISE GRADE
-Real EnsembleData Integration with Advanced Features
+Cookie-based TikTok fetch using user-supplied cookies
 """
 
 import asyncio
@@ -44,11 +44,9 @@ class ProductionConfig:
     API_TITLE = os.getenv("API_TITLE", "TikTok Data API - Production")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 
-    # EnsembleData Configuration
-    ENSEMBLEDATA_BASE_URL = os.getenv("ENSEMBLEDATA_BASE_URL", "https://ensembledata.com/apis")
-    ENSEMBLEDATA_TOKEN = os.getenv("ENSEMBLEDATA_TOKEN", "YOUR_ENSEMBLE_TOKEN")
-    ENSEMBLEDATA_TIMEOUT = int(os.getenv("ENSEMBLEDATA_TIMEOUT", "30"))
-    ENSEMBLEDATA_MAX_RETRIES = int(os.getenv("ENSEMBLEDATA_MAX_RETRIES", "3"))
+    # TikTok cookie client (optional global cookie)
+    # If provided, will be used as default. Per-request cookies are supported via X-TikTok-Cookie header.
+    TIKTOK_COOKIE = os.getenv("TIKTOK_COOKIE")
 
     # Redis Cache Configuration
     REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -404,7 +402,7 @@ class APIResponse(BaseModel):
 app = FastAPI(
     title=ProductionConfig.API_TITLE,
     version=ProductionConfig.API_VERSION,
-    description="Production-grade TikTok data retrieval API with real-time EnsembleData integration",
+    description="Production-grade TikTok data retrieval API (cookie-based scraping)",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
@@ -581,10 +579,10 @@ async def get_posts(
     xt_cookie: Optional[str] = Header(None, alias="X-TikTok-Cookie")
 ):
     """
-    Fetch TikTok posts with real-time data from EnsembleData
+    Fetch TikTok posts by scraping TikTok pages using provided cookies
 
     Production endpoint with:
-    - Real data from EnsembleData API
+    - Real data scraped from TikTok using cookies
     - Redis caching for performance
     - Advanced rate limiting
     - Comprehensive error handling

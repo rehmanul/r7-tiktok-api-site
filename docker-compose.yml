@@ -11,7 +11,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
-      - ENSEMBLEDATA_TOKEN=${ENSEMBLEDATA_TOKEN}
+      - TIKTOK_COOKIE=${TIKTOK_COOKIE}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tiktok_api

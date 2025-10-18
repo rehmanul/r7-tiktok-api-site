@@ -17,14 +17,15 @@ fi
 # Load environment variables
 export $(cat .env.production | xargs)
 
-# Check for EnsembleData token
-if [ "$ENSEMBLEDATA_TOKEN" = "your_token_here" ]; then
-    echo "❌ Error: Please configure ENSEMBLEDATA_TOKEN in .env.production"
-    exit 1
+# Optional: check for TIKTOK_COOKIE presence
+if grep -q "^TIKTOK_COOKIE=" .env.production; then
+    echo "TIKTOK_COOKIE found in .env.production (will be used as default cookie)"
+else
+    echo "Note: TIKTOK_COOKIE not found in .env.production. You can supply cookies per-request via X-TikTok-Cookie header or set TIKTOK_COOKIE in env."
 fi
 
 echo ""
-echo "✅ Environment validated"
+echo "✅ Environment validated (basic checks)"
 echo ""
 
 # Pull latest images
