@@ -1,0 +1,6 @@
+# Ignore local cookie files and venvs
+cookies.json
+venv_test/
+.env
+__pycache__/
+output/*.json
