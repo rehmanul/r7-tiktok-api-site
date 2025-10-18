@@ -1,7 +1,7 @@
 import json
 import pytest
 
-from production_api_real import parse_embedded_json
+from production_parser import parse_embedded_json
 
 
 def load_fixture(name: str) -> str:
@@ -12,7 +12,7 @@ def load_fixture(name: str) -> str:
 
 def test_parse_next_data(tmp_path):
     html = """
-    <html><head><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"items":[{"id":"1","desc":"hello"}]}}</script></head></html>
+    <html><head><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"items":[{"id":"1","desc":"hello"}]}}}</script></head></html>
     """
 
     items = parse_embedded_json(html)
