@@ -96,3 +96,27 @@ Next steps / Recommendations:
 - Use a proper secret manager (Vault, AWS Secrets Manager, Azure Key Vault) for production secrets.
 - Add real integration tests that exercise the app with a running Docker Compose stack.
 - Set up alerting (Sentry is scaffolded) and metrics scraping (Prometheus).
+
+Testing & CI
+-----------
+
+Unit tests for the parser are included in `tests/test_parser.py`. To run locally:
+
+```powershell
+python -m pip install -r requirements.txt
+pytest -q
+```
+
+GitHub Actions
+--------------
+
+This repository includes a workflow `.github/workflows/vercel-deploy.yml` that will deploy the project to Vercel on pushes to `main`. The workflow requires these repository secrets to be set in GitHub:
+
+- `VERCEL_TOKEN` - your Vercel API token
+- `VERCEL_ORG_ID` - Vercel organization ID
+- `VERCEL_PROJECT_ID` - Vercel project ID
+
+Proxy rotation
+--------------
+
+If you expect heavy scraping you may provide a comma-separated `PROXIES` environment variable (e.g. `http://user:pass@proxy1:3128,http://proxy2:3128`) in your runtime environment. The client will rotate proxies per-request when `PROXY_ROTATION` is enabled.

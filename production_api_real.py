@@ -61,6 +61,14 @@ class ProductionConfig:
     # Performance
     MAX_CONCURRENT_REQUESTS = int(os.getenv("MAX_CONCURRENT_REQUESTS", "10"))
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "60"))
+    # Retry/backoff
+    MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+    BACKOFF_BASE = float(os.getenv("BACKOFF_BASE", "0.5"))
+
+    # Throttling & proxies
+    THROTTLE_DELAY = float(os.getenv("THROTTLE_DELAY", "0.2"))
+    PROXIES = os.getenv("PROXIES")  # comma-separated proxy URLs
+    PROXY_ROTATION = os.getenv("PROXY_ROTATION", "True").lower() in ("1", "true", "yes")
     ENABLE_COMPRESSION = os.getenv("ENABLE_COMPRESSION", "True").lower() in ("1", "true", "yes")
 
     # Database (for future persistence)
@@ -146,6 +154,9 @@ class TikTokClient:
         self.client: Optional[httpx.AsyncClient] = None
         self.request_count = 0
         self.error_count = 0
+    self._semaphore: Optional[asyncio.Semaphore] = None
+    self._proxy_list: List[str] = []
+    self._proxy_index = 0
 
     async def initialize(self):
         headers = {
@@ -163,6 +174,13 @@ class TikTokClient:
                     k, v = part.strip().split("=", 1)
                     cookies[k] = v
 
+        # Configure proxy rotation if provided via env
+        if ProductionConfig.PROXIES:
+            self._proxy_list = [p.strip() for p in ProductionConfig.PROXIES.split(',') if p.strip()]
+
+        self._semaphore = asyncio.Semaphore(ProductionConfig.MAX_CONCURRENT_REQUESTS)
+
+        # Create client without proxies here; proxies passed per-request to allow rotation
         self.client = httpx.AsyncClient(timeout=self.timeout, headers=headers, cookies=cookies)
         logger.info("✅ TikTok cookie client initialized")
 
@@ -176,70 +194,75 @@ class TikTokClient:
             await self.initialize()
 
         url = f"https://www.tiktok.com/@{username}"
-        self.request_count += 1
+        posts: List[Dict] = []
 
-        try:
-            resp = await self.client.get(url, follow_redirects=True)
-            text = resp.text
+        # Acquire semaphore to throttle concurrency
+        if not self._semaphore:
+            self._semaphore = asyncio.Semaphore(ProductionConfig.MAX_CONCURRENT_REQUESTS)
 
-            # Try to find JSON in __NEXT_DATA__ script
-            posts = []
+        attempt = 0
+        last_exc: Optional[Exception] = None
 
-            # Search for __NEXT_DATA__
-            start = text.find('<script id="__NEXT_DATA__" type="application/json">')
-            if start != -1:
-                start = text.find('>', start) + 1
-                end = text.find('</script>', start)
-                raw = text[start:end].strip()
-                try:
-                    data = json.loads(raw)
-                    items = (
-                        data.get('props', {}).get('pageProps', {}).get('items') or
-                        data.get('props', {}).get('pageProps', {}).get('awemeList') or []
-                    )
+        while attempt < ProductionConfig.MAX_RETRIES:
+            attempt += 1
+            selected_proxy = None
+            proxies_arg = None
+            if self._proxy_list:
+                # rotate proxies if requested
+                if ProductionConfig.PROXY_ROTATION:
+                    idx = self._proxy_index % len(self._proxy_list)
+                    self._proxy_index = (self._proxy_index + 1) % len(self._proxy_list)
+                else:
+                    idx = 0
+                selected_proxy = self._proxy_list[idx]
+                proxies_arg = selected_proxy
+
+            try:
+                async with self._semaphore:
+                    self.request_count += 1
+                    # per-request proxies support
+                    if proxies_arg:
+                        resp = await self.client.get(url, follow_redirects=True, proxies=proxies_arg)
+                    else:
+                        resp = await self.client.get(url, follow_redirects=True)
+
+                    text = resp.text
+
+                    # Use robust parser to extract embedded JSON items
+                    items = parse_embedded_json(text)
+                    if not items:
+                        logger.debug(f"Parse returned no items for @{username} (attempt {attempt})")
+                        # Backoff and retry
+                        last_exc = Exception("parsing returned no items")
+                        await asyncio.sleep(ProductionConfig.BACKOFF_BASE * (2 ** (attempt - 1)))
+                        continue
+
                     for item in items[:max_posts]:
                         posts.append(self._item_to_post(item))
+
+                    # Throttle a bit to avoid bursts
+                    await asyncio.sleep(ProductionConfig.THROTTLE_DELAY)
+
                     return posts
-                except Exception:
-                    pass
 
-            # Fallback: look for window['SIGI_STATE'] or 'SIGI_STATE' assignment
-            sigi_idx = text.find('window["SIGI_STATE"]')
-            if sigi_idx == -1:
-                sigi_idx = text.find('window.SIGI_STATE')
+            except httpx.RequestError as e:
+                self.error_count += 1
+                last_exc = e
+                logger.warning(f"Request error fetching @{username} (attempt {attempt}): {e}")
+                await asyncio.sleep(ProductionConfig.BACKOFF_BASE * (2 ** (attempt - 1)))
+                continue
+            except Exception as e:
+                self.error_count += 1
+                last_exc = e
+                logger.exception(f"Unexpected error fetching @{username} (attempt {attempt}): {e}")
+                await asyncio.sleep(ProductionConfig.BACKOFF_BASE * (2 ** (attempt - 1)))
+                continue
 
-            if sigi_idx != -1:
-                eq = text.find('=', sigi_idx)
-                if eq != -1:
-                    semi = text.find('};', eq)
-                    if semi != -1:
-                        raw = text[eq + 1:semi + 1].strip()
-                        try:
-                            data = json.loads(raw)
-                            # navigate to item list
-                            items = []
-                            try:
-                                items = list(data.get('ItemModule', {}).values())
-                            except Exception:
-                                items = []
-                            for item in items[:max_posts]:
-                                posts.append(self._item_to_post(item))
-                            return posts
-                        except Exception:
-                            pass
-
-            # If we reach here, parsing failed
-            logger.warning(f"⚠️  Unable to parse TikTok page for @{username}; status={resp.status_code}")
-            return []
-
-        except httpx.RequestError as e:
-            self.error_count += 1
-            logger.error(f"❌ Request error fetching @{username}: {e}")
+        # all attempts failed
+        logger.error(f"Failed to fetch @{username} after {ProductionConfig.MAX_RETRIES} attempts: {last_exc}")
+        if isinstance(last_exc, httpx.RequestError):
             raise HTTPException(status_code=503, detail="Failed to reach TikTok")
-        except Exception as e:
-            self.error_count += 1
-            logger.error(f"❌ Unexpected error fetching @{username}: {e}")
-            raise HTTPException(status_code=500, detail="Internal parsing error")
+        raise HTTPException(status_code=502, detail="Failed to parse TikTok page")
 
     def _item_to_post(self, item: Dict) -> Dict:
         """Normalize a TikTok item into our post structure"""
@@ -263,6 +286,112 @@ class TikTokClient:
         except Exception as e:
             logger.warning(f"⚠️  Failed to normalize item: {e}")
             return {'video_id': '', 'url': '', 'description': '', 'epoch_time_posted': 0, 'views': 0, 'likes': 0, 'comments': 0, 'shares': 0}
+
+
+# ============= PARSING UTILITIES =============
+def parse_embedded_json(html: str) -> List[Dict]:
+    """Attempt to extract embedded JSON payloads from a TikTok HTML page.
+
+    Handles multiple variants:
+    - <script id="__NEXT_DATA__"> JSON
+    - window['SIGI_STATE'] = {...}
+    - window.SIGI_STATE = {...}
+    - inline JSON usages like "{...}" assigned to props
+
+    Returns a list of raw item dicts (un-normalized).
+    """
+    results: List[Dict] = []
+
+    try:
+        # 1) Try __NEXT_DATA__
+        marker = '<script id="__NEXT_DATA__" type="application/json">'
+        idx = html.find(marker)
+        if idx != -1:
+            start = html.find('>', idx) + 1
+            end = html.find('</script>', start)
+            raw = html[start:end].strip()
+            try:
+                data = json.loads(raw)
+                items = (
+                    data.get('props', {}).get('pageProps', {}).get('items') or
+                    data.get('props', {}).get('pageProps', {}).get('awemeList') or []
+                )
+                if items:
+                    return items
+            except Exception:
+                # fallthrough
+                pass
+
+        # 2) Try SIGI_STATE variants
+        sigi_variants = ['window["SIGI_STATE"]', 'window.SIGI_STATE']
+        for v in sigi_variants:
+            si = html.find(v)
+            if si != -1:
+                eq = html.find('=', si)
+                if eq != -1:
+                    # attempt to extract a JSON object by finding the matching braces
+                    brace_start = html.find('{', eq)
+                    if brace_start != -1:
+                        # simple brace matching
+                        depth = 0
+                        i = brace_start
+                        while i < len(html):
+                            if html[i] == '{':
+                                depth += 1
+                            elif html[i] == '}':
+                                depth -= 1
+                                if depth == 0:
+                                    candidate = html[brace_start:i+1]
+                                    try:
+                                        data = json.loads(candidate)
+                                        # look for ItemModule or modules with items
+                                        items = []
+                                        if isinstance(data, dict):
+                                            if 'ItemModule' in data:
+                                                items = list(data.get('ItemModule', {}).values())
+                                            else:
+                                                # try nested values
+                                                for k in data.values():
+                                                    if isinstance(k, dict) and 'ItemModule' in k:
+                                                        items = list(k.get('ItemModule', {}).values())
+                                                        break
+                                        if items:
+                                            return items
+                                    except Exception:
+                                        pass
+                                    break
+                            i += 1
+
+        # 3) Generic fallback: try to find any large JSON blob containing 'ItemModule' or 'awemeList'
+        json_start = html.find('{')
+        if json_start != -1:
+            # search for occurrences of awemeList or ItemModule in substrings
+            for keyword in ('awemeList', 'ItemModule', 'aweme'):
+                kidx = html.find(keyword)
+                if kidx != -1:
+                    # attempt to locate surrounding braces
+                    # find earlier '{'
+                    bs = html.rfind('{', 0, kidx)
+                    if bs != -1:
+                        # attempt small slice
+                        slice_end = html.find('}', kidx)
+                        if slice_end != -1:
+                            candidate = html[bs:slice_end+1]
+                            try:
+                                data = json.loads(candidate)
+                                # extract items if possible
+                                items = data.get('props', {}).get('pageProps', {}).get('items') or data.get('ItemModule') or []
+                                if isinstance(items, dict):
+                                    return list(items.values())
+                                if items:
+                                    return items
+                            except Exception:
+                                pass
+
+    except Exception:
+        logger.exception('Error during parse_embedded_json')
+
+    return results
 
     def get_metrics(self) -> Dict:
         return {
