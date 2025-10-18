@@ -1,10 +1,4 @@
 {
-    "rewrites": [
-        {
-            "source": "/(.*)",
-            "destination": "/api/tiktok"
-        }
-    ],
     "functions": {
         "api/tiktok.js": {
             "memory": 3008,
