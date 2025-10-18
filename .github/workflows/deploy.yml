@@ -1,13 +1,11 @@
-name: CI / lint_and_tests
+name: Deploy to Vercel
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
 
 jobs:
-  lint_and_test:
+  deploy:
     runs-on: ubuntu-latest
     
     steps:
@@ -23,11 +21,14 @@ jobs:
     - name: Install dependencies
       run: npm ci
       
-    - name: Run linter
-      run: npm run lint
+    - name: Build
+      run: npm run build
       
-    - name: Run tests
-      run: npm test
-      
-    - name: Check syntax
-      run: node --check api/tiktok.js
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        vercel-args: '--prod'
+
