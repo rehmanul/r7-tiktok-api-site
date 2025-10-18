@@ -1,4 +1,9 @@
 // api/tiktok.js - Vercel Serverless Function
+<<<<<<< HEAD
+=======
+import puppeteer from 'puppeteer-core';
+import chromiumPkg from '@sparticuz/chromium';
+>>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 
 // Hardcoded TikTok cookies - UPDATE THESE PERIODICALLY
 const TIKTOK_COOKIES = [
@@ -51,6 +56,7 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
+<<<<<<< HEAD
     // Launch browser with environment-specific configuration
     let browser;
     // Force local development mode for Windows environment
@@ -102,6 +108,24 @@ export default async function handler(req, res) {
         timeout: 60000
       });
     }
+=======
+    // Launch browser with puppeteer optimized for serverless
+    const browser = await puppeteer.launch({
+      args: [
+        ...chromiumPkg.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu'
+      ],
+      executablePath: await chromiumPkg.executablePath(),
+      headless: true,
+    });
+>>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
