@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field, validator
+import httpx
 import aiohttp
 from functools import lru_cache
 import redis.asyncio as aioredis
@@ -224,212 +225,144 @@ class AdvancedRateLimiter:
             }
 
 
-# ============= ENSEMBLEDATA CLIENT =============
+# ============= TIKTOK (COOKIE) CLIENT =============
 
-class EnsembleDataClient:
-    """Production EnsembleData API client with retries and error handling"""
+class TikTokClient:
+    """Fetch TikTok user posts using a user-provided cookie string.
 
-    def __init__(self, token: str):
-        self.token = token
-        self.base_url = ProductionConfig.ENSEMBLEDATA_BASE_URL
-        self.session: Optional[aiohttp.ClientSession] = None
+    This client uses HTTP GET against TikTok public pages and extracts embedded JSON
+    (from __NEXT_DATA__ or SIGI_STATE). It requires a valid TikTok cookie string
+    (e.g. from a browser) to access private/age-gated content and reduce blocking.
+    """
+
+    def __init__(self, cookie: Optional[str] = None, timeout: int = 20):
+        self.cookie = cookie or os.getenv("TIKTOK_COOKIE")
+        self.timeout = timeout
+        self.client: Optional[httpx.AsyncClient] = None
         self.request_count = 0
         self.error_count = 0
 
     async def initialize(self):
-        """Initialize HTTP session"""
-        self.session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=ProductionConfig.ENSEMBLEDATA_TIMEOUT)
-        )
-        logger.info("✅ EnsembleData client initialized")
-
-    async def close(self):
-        """Close HTTP session"""
-        if self.session:
-            await self.session.close()
-
-    async def fetch_user_posts(self, username: str, max_posts: int = 100) -> List[Dict]:
-        """Fetch posts from EnsembleData with retry logic"""
-
-        url = f"{self.base_url}/tt/user/posts"
-        params = {
-            "username": username.replace("@", ""),
-            "depth": min(max_posts // 10, 10),  # EnsembleData depth parameter
-            "token": self.token
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
         }
 
-        for attempt in range(ProductionConfig.ENSEMBLEDATA_MAX_RETRIES):
-            try:
-                logger.info(f"🔄 Fetching TikTok data for @{username} (attempt {attempt + 1})")
-                self.request_count += 1
+        cookies = None
+        if self.cookie:
+            # Accept either a raw cookie header string or JSON-like 'k=v; k2=v2'
+            cookies = {}
+            for part in self.cookie.split(";"):
+                if "=" in part:
+                    k, v = part.strip().split("=", 1)
+                    cookies[k] = v
 
-                async with self.session.get(url, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        posts = self._parse_response(data, max_posts)
-                        logger.info(f"✅ Retrieved {len(posts)} posts for @{username}")
-                        return posts
+        self.client = httpx.AsyncClient(timeout=self.timeout, headers=headers, cookies=cookies)
+        logger.info("✅ TikTok cookie client initialized")
 
-                    elif response.status == 401:
-                        self.error_count += 1
-                        logger.error("❌ EnsembleData: Invalid API token")
-                        raise HTTPException(
-                            status_code=503,
-                            detail="Data source authentication failed. Check API token."
-                        )
+    async def close(self):
+        if self.client:
+            await self.client.aclose()
 
-                    elif response.status == 429:
-                        retry_after = int(response.headers.get("Retry-After", 60))
-                        logger.warning(f"⚠️  EnsembleData rate limit, retry after {retry_after}s")
+    async def fetch_user_posts(self, username: str, max_posts: int = 100) -> List[Dict]:
+        """Fetch a user's posts by scraping the user page and extracting embedded JSON."""
+        if not self.client:
+            await self.initialize()
 
-                        if attempt < ProductionConfig.ENSEMBLEDATA_MAX_RETRIES - 1:
-                            await asyncio.sleep(retry_after)
-                            continue
-                        else:
-                            raise HTTPException(
-                                status_code=429,
-                                detail="Data source rate limit exceeded. Try again later."
-                            )
+        url = f"https://www.tiktok.com/@{username}"
+        self.request_count += 1
 
-                    elif response.status == 404:
-                        logger.warning(f"⚠️  Username @{username} not found")
-                        return []
+        try:
+            resp = await self.client.get(url, follow_redirects=True)
+            text = resp.text
 
-                    else:
-                        self.error_count += 1
-                        error_text = await response.text()
-                        logger.error(f"❌ EnsembleData error {response.status}: {error_text}")
+            # Try to find JSON in __NEXT_DATA__ script
+            posts = []
 
-                        if attempt < ProductionConfig.ENSEMBLEDATA_MAX_RETRIES - 1:
-                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
-                            continue
-                        else:
-                            raise HTTPException(
-                                status_code=503,
-                                detail=f"Data source error: {response.status}"
-                            )
-
-            except asyncio.TimeoutError:
-                self.error_count += 1
-                logger.error(f"⏱️  Request timeout for @{username}")
-
-                if attempt < ProductionConfig.ENSEMBLEDATA_MAX_RETRIES - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                else:
-                    raise HTTPException(
-                        status_code=504,
-                        detail="Data source timeout"
+            # Search for __NEXT_DATA__
+            start = text.find('<script id="__NEXT_DATA__" type="application/json">')
+            if start != -1:
+                start = text.find('>', start) + 1
+                end = text.find('</script>', start)
+                raw = text[start:end].strip()
+                try:
+                    data = json.loads(raw)
+                    items = (
+                        data.get('props', {}).get('pageProps', {}).get('items') or
+                        data.get('props', {}).get('pageProps', {}).get('awemeList') or []
                     )
+                    for item in items[:max_posts]:
+                        posts.append(self._item_to_post(item))
+                    return posts
+                except Exception:
+                    pass
 
-            except HTTPException:
-                raise
+            # Fallback: look for window['SIGI_STATE'] or 'SIGI_STATE' assignment
+            sigi_idx = text.find('window["SIGI_STATE"]')
+            if sigi_idx == -1:
+                sigi_idx = text.find('window.SIGI_STATE')
 
-            except Exception as e:
-                self.error_count += 1
-                logger.error(f"❌ Unexpected error: {str(e)}")
+            if sigi_idx != -1:
+                eq = text.find('=', sigi_idx)
+                if eq != -1:
+                    semi = text.find('};', eq)
+                    if semi != -1:
+                        raw = text[eq + 1:semi + 1].strip()
+                        try:
+                            data = json.loads(raw)
+                            # navigate to item list
+                            items = []
+                            try:
+                                items = list(data.get('ItemModule', {}).values())
+                            except Exception:
+                                items = []
+                            for item in items[:max_posts]:
+                                posts.append(self._item_to_post(item))
+                            return posts
+                        except Exception:
+                            pass
 
-                if attempt < ProductionConfig.ENSEMBLEDATA_MAX_RETRIES - 1:
-                    await asyncio.sleep(2 ** attempt)
-                    continue
-                else:
-                    raise HTTPException(
-                        status_code=503,
-                        detail=f"Failed to fetch data: {str(e)}"
-                    )
+            # If we reach here, parsing failed
+            logger.warning(f"⚠️  Unable to parse TikTok page for @{username}; status={resp.status_code}")
+            return []
 
-        return []
+        except httpx.RequestError as e:
+            self.error_count += 1
+            logger.error(f"❌ Request error fetching @{username}: {e}")
+            raise HTTPException(status_code=503, detail="Failed to reach TikTok")
+        except Exception as e:
+            self.error_count += 1
+            logger.error(f"❌ Unexpected error fetching @{username}: {e}")
+            raise HTTPException(status_code=500, detail="Internal parsing error")
 
-    def _parse_response(self, data: Dict, max_posts: int) -> List[Dict]:
-        """Parse EnsembleData response"""
-        posts = []
+    def _item_to_post(self, item: Dict) -> Dict:
+        """Normalize a TikTok item into our post structure"""
+        try:
+            video_id = str(item.get('id') or item.get('video', {}).get('id') or item.get('aweme_id') or '')
+            author = item.get('author') or item.get('authorMeta') or {}
+            username = author.get('uniqueId') or author.get('name') or item.get('author', '')
 
-        # Handle different response structures
-        items = (
-            data.get("data", {}).get("posts", []) or
-            data.get("posts", []) or
-            data.get("items", []) or
-            data.get("aweme_list", [])
-        )
+            stats = item.get('stats') or item.get('statistics') or {}
 
-        for item in items[:max_posts]:
-            try:
-                # Extract fields with multiple possible keys
-                video_id = str(
-                    item.get("id") or 
-                    item.get("aweme_id") or 
-                    item.get("video_id") or 
-                    ""
-                )
-
-                author_info = item.get("author", {})
-                username = (
-                    author_info.get("uniqueId") or 
-                    author_info.get("unique_id") or
-                    item.get("username") or
-                    ""
-                )
-
-                stats = item.get("stats", {}) or item.get("statistics", {})
-
-                post = {
-                    "video_id": video_id,
-                    "url": f"https://www.tiktok.com/@{username}/video/{video_id}",
-                    "description": (
-                        item.get("desc") or 
-                        item.get("description") or 
-                        item.get("title") or 
-                        ""
-                    ),
-                    "epoch_time_posted": (
-                        item.get("createTime") or 
-                        item.get("create_time") or 
-                        item.get("timestamp") or 
-                        0
-                    ),
-                    "views": (
-                        stats.get("playCount") or 
-                        stats.get("play_count") or 
-                        stats.get("view_count") or 
-                        0
-                    ),
-                    "likes": (
-                        stats.get("diggCount") or 
-                        stats.get("digg_count") or 
-                        stats.get("like_count") or 
-                        0
-                    ),
-                    "comments": (
-                        stats.get("commentCount") or 
-                        stats.get("comment_count") or 
-                        0
-                    ),
-                    "shares": (
-                        stats.get("shareCount") or 
-                        stats.get("share_count") or 
-                        0
-                    )
-                }
-
-                # Validate post has minimum required data
-                if post["video_id"] and post["epoch_time_posted"]:
-                    posts.append(post)
-
-            except Exception as e:
-                logger.warning(f"⚠️  Failed to parse post: {str(e)}")
-                continue
-
-        return posts
+            return {
+                'video_id': video_id,
+                'url': f"https://www.tiktok.com/@{username}/video/{video_id}",
+                'description': item.get('desc') or item.get('description') or item.get('title') or '',
+                'epoch_time_posted': int(item.get('createTime') or item.get('create_time') or item.get('timestamp') or 0),
+                'views': int(stats.get('playCount') or stats.get('view_count') or 0),
+                'likes': int(stats.get('diggCount') or stats.get('like_count') or 0),
+                'comments': int(stats.get('commentCount') or stats.get('comment_count') or 0),
+                'shares': int(stats.get('shareCount') or stats.get('share_count') or 0)
+            }
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to normalize item: {e}")
+            return {'video_id': '', 'url': '', 'description': '', 'epoch_time_posted': 0, 'views': 0, 'likes': 0, 'comments': 0, 'shares': 0}
 
     def get_metrics(self) -> Dict:
-        """Get client metrics"""
         return {
-            "total_requests": self.request_count,
-            "total_errors": self.error_count,
-            "success_rate": round(
-                (self.request_count - self.error_count) / max(self.request_count, 1) * 100,
-                2
-            )
+            'total_requests': self.request_count,
+            'total_errors': self.error_count,
         }
 
 
@@ -492,7 +425,7 @@ if ProductionConfig.ENABLE_COMPRESSION:
 # Global instances
 cache: RedisCache = None
 rate_limiter: AdvancedRateLimiter = None
-ensemble_client: EnsembleDataClient = None
+tiktok_client: TikTokClient = None
 
 # API Keys (in production, load from database/env)
 API_KEYS = {
@@ -532,13 +465,12 @@ async def startup():
     rate_limiter = AdvancedRateLimiter(cache)
     logger.info("✅ Rate limiter initialized")
 
-    # Initialize EnsembleData client
-    ensemble_client = EnsembleDataClient(ProductionConfig.ENSEMBLEDATA_TOKEN)
-    # If EnsembleData token is missing, log warning and continue in degraded mode
-    if not ProductionConfig.ENSEMBLEDATA_TOKEN or ProductionConfig.ENSEMBLEDATA_TOKEN == "YOUR_ENSEMBLE_TOKEN":
-        logger.warning("EnsembleData token not configured; EnsembleData client will run in degraded mode")
-    else:
-        await ensemble_client.initialize()
+    # Initialize TikTok cookie client (can be overridden per-request via header)
+    tiktok_client = TikTokClient(cookie=os.getenv("TIKTOK_COOKIE"))
+    try:
+        await tiktok_client.initialize()
+    except Exception:
+        logger.warning("TikTok client failed to initialize; will attempt per-request initialization")
 
     logger.info("="*80)
     logger.info("✅ ALL SYSTEMS OPERATIONAL")
@@ -550,8 +482,8 @@ async def shutdown():
     """Cleanup on shutdown"""
     logger.info("🛑 Shutting down...")
 
-    if ensemble_client:
-        await ensemble_client.close()
+    if tiktok_client:
+        await tiktok_client.close()
 
     if cache:
         await cache.disconnect()
@@ -625,7 +557,7 @@ async def root():
 async def health():
     """Health check"""
     cache_stats = await cache.get_stats() if cache else {"enabled": False}
-    ensemble_metrics = ensemble_client.get_metrics() if ensemble_client else {}
+    tiktok_metrics = tiktok_client.get_metrics() if tiktok_client else {}
 
     return {
         "status": "healthy",
@@ -633,7 +565,7 @@ async def health():
         "version": ProductionConfig.API_VERSION,
         "services": {
             "cache": cache_stats,
-            "ensemble_api": ensemble_metrics
+            "tiktok_client": tiktok_metrics
         }
     }
 
@@ -645,7 +577,8 @@ async def get_posts(
     per_page: int = Query(20, ge=1, le=100),
     start_epoch: Optional[int] = Query(None, ge=0),
     end_epoch: Optional[int] = Query(None, ge=0),
-    x_api_key: str = Header(..., alias="X-API-Key")
+    x_api_key: str = Header(..., alias="X-API-Key"),
+    xt_cookie: Optional[str] = Header(None, alias="X-TikTok-Cookie")
 ):
     """
     Fetch TikTok posts with real-time data from EnsembleData
@@ -705,9 +638,17 @@ async def get_posts(
         response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
         return response
 
-    # Fetch real data
+    # Fetch real data using TikTok cookie client
     try:
-        all_posts = await ensemble_client.fetch_user_posts(username, max_posts=200)
+        # If request provided a cookie header, create a per-request client
+        if xt_cookie:
+            per_client = TikTokClient(cookie=xt_cookie)
+            await per_client.initialize()
+            all_posts = await per_client.fetch_user_posts(username, max_posts=200)
+            await per_client.close()
+        else:
+            # use global client
+            all_posts = await tiktok_client.fetch_user_posts(username, max_posts=200)
 
         if not all_posts:
             return APIResponse(

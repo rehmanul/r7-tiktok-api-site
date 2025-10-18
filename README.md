@@ -55,9 +55,37 @@ Steps to deploy to Vercel:
 4. Deploy. The `vercel.json` config routes all requests to `api/index.py` which serves the FastAPI app.
 
 Notes:
+
 - Serverless functions on Vercel have execution time limits. For long-running EnsembleData fetches or high-concurrency workloads consider deploying to a container platform (K8s) or using Vercel's Advanced/Enterprise options.
 - Local redis/postgres are not available on Vercel; use managed services and set the connection strings in the environment.
 
+Using your own TikTok cookies (no EnsembleData)
+---------------------------------------------
+
+This project can use your TikTok browser cookies to fetch pages directly from TikTok instead of relying on EnsembleData.
+
+Two ways to provide cookies:
+
+1) Per-request header: include `X-TikTok-Cookie` with the value from your browser (example: `s_v_web_id=...; tt_webid_v2=...; ...`).
+    Example curl:
+
+```bash
+curl -H "X-API-Key: prod_key_001" -H "X-TikTok-Cookie: 's_v_web_id=...; tt_webid_v2=...; '" \
+   "https://your-vercel-deployment.vercel.app/v1/tiktok/posts?username=someuser"
+```
+
+2) Global environment variable: set `TIKTOK_COOKIE` in Vercel Project Settings (Environment Variables). The app will use this cookie as a default client.
+
+How to extract cookies from your browser (Chrome/Chromium):
+
+1. Open Developer Tools (F12) -> Application -> Cookies -> https://www.tiktok.com
+2. Copy the cookie key/value pairs and join them with `; ` (semicolon + space)
+3. Use the cookie string in the `X-TikTok-Cookie` header or set `TIKTOK_COOKIE` in Vercel.
+
+Caveats & legality:
+- Scraping TikTok may violate their terms of service. Ensure you have the right to use and store these cookies. Do not expose other users' private data.
+- Cookies expire and must be refreshed when invalid.
+- Vercel serverless functions have limited execution time — long scraping may fail.
 
 Next steps / Recommendations:
 
