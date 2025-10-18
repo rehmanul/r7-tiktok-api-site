@@ -4,3 +4,4 @@ venv_test/
 .env
 __pycache__/
 output/*.json
+.vercel

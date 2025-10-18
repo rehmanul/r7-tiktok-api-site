@@ -15,7 +15,7 @@ However, it quickly became difficult to maintain because of the pace of `puppete
 
 ## Install
 
-[`puppeteer` ships with a prefered version of `chromium`](https://pptr.dev/faq/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy). In order to figure out what version of `@sparticuz/chromium` you will need, please visit [Puppeteer's Chromium Support page](https://pptr.dev/chromium-support).
+[`puppeteer` ships with a preferred version of `chromium`](https://pptr.dev/faq/#q-why-doesnt-puppeteer-vxxx-work-with-chromium-vyyy). In order to figure out what version of `@sparticuz/chromium` you will need, please visit [Puppeteer's Chromium Support page](https://pptr.dev/chromium-support).
 
 > For example, as of today, the latest version of `puppeteer` is `18.0.5`. The latest version of `chromium` stated on `puppeteer`'s support page is `106.0.5249.0`. So you need to install `@sparticuz/chromium@106`.
 
@@ -26,7 +26,7 @@ npm install --save puppeteer-core@$PUPPETEER_VERSION
 npm install --save-dev @sparticuz/chromium@$CHROMIUM_VERSION
 ```
 
-If your vendor does not allow large deploys (`chromium.br` is 50+ MB), you'll need to host the `chromium-v#-pack.tar` separatly and use the [`@sparticuz/chromium-min` package](https://github.com/Sparticuz/chromium#-min-package).
+If your vendor does not allow large deploys (`chromium.br` is 50+ MB), you'll need to host the `chromium-v#-pack.tar` separately and use the [`@sparticuz/chromium-min` package](https://github.com/Sparticuz/chromium#-min-package).
 
 ```shell
 npm install --save @sparticuz/chromium-min@$CHROMIUM_VERSION
@@ -39,7 +39,7 @@ If you wish to install an older version of Chromium, take a look at [@sparticuz/
 The @sparticuz/chromium version schema is as follows:
 `MajorChromiumVersion.MinorChromiumIncrement.@Sparticuz/chromiumPatchLevel`
 
-Beacuse this package follows Chromium's releases, it does NOT follow semantic versioning. **Breaking changes can occur with the 'patch' level.** Please check the release notes for information on breaking changes.
+Because this package follows Chromium's releases, it does NOT follow semantic versioning. **Breaking changes can occur with the 'patch' level.** Please check the release notes for information on breaking changes.
 
 ## Usage
 
@@ -50,7 +50,9 @@ const test = require("node:test");
 const puppeteer = require("puppeteer-core");
 const chromium = require("@sparticuz/chromium");
 
-// Optional: If you'd like to use the legacy headless mode. "new" is the default.
+// Optional: If you'd like to use the new headless mode. "shell" is the default.
+// NOTE: Because we build the shell binary, this option does not work.
+//       However, this option will stay so when we migrate to full chromium it will work.
 chromium.setHeadlessMode = true;
 
 // Optional: If you'd like to disable webgl, true is the default.
@@ -157,13 +159,13 @@ Here are some example projects and help with other services
 - [Serverless Framework with Lambda Layer](https://github.com/Sparticuz/chromium/tree/master/examples/serverless-with-lambda-layer)
 - [Serverless Framework with Pre-existing Lambda Layer](https://github.com/Sparticuz/chromium/tree/master/examples/serverless-with-preexisting-lambda-layer)
 - [Chromium-min](https://github.com/Sparticuz/chromium/tree/master/examples/remote-min-binary)
-- AWS SAM _TODO_
+- [AWS SAM](https://github.com/Sparticuz/chromium/tree/master/examples/aws-sam)
 - [Webpack](https://github.com/Sparticuz/chromium/issues/24#issuecomment-1343196897)
 - [Netlify](https://github.com/Sparticuz/chromium/issues/24#issuecomment-1414107620)
 
 ### Running Locally & Headless/Headful mode
 
-This version of `chromium` is built using the `headless.gn` build variables, which does not appear to even include a GUI. [Also, at this point, AWS Lambda 2 does not support a modern version of `glibc`](https://github.com/aws/aws-lambda-base-images/issues/59), so this package does not include an ARM version yet, which means it will not work on any M Series Apple products. If you need to test your code using a headful or ARM version, please use your locally installed version of `chromium/chrome`, or you may use the `puppeteer` provided version.
+This version of `chromium` is built using the `headless.gn` build variables, which does not appear to even include a GUI. [Also, at this point, AWS Lambda 2 does not support a modern version of `glibc`](https://github.com/aws/aws-lambda-base-images/issues/59), so this package does not include an ARM version yet, which means it will not work on any M Series Apple products. If you need to test your code using a headful or ARM version, please use your locally installed version of `chromium/chrome`, or you may use the `puppeteer` provided version. Users have reported installing `rosetta` on MacOS will also work.
 
 ```shell
 npx @puppeteer/browsers install chromium@latest --path /tmp/localChromium
@@ -171,7 +173,7 @@ npx @puppeteer/browsers install chromium@latest --path /tmp/localChromium
 
 For more information on installing a specific version of `chromium`, checkout [@puppeteer/browsers](https://www.npmjs.com/package/@puppeteer/browsers).
 
-For example, you can set your code to use an ENV variable such as `IS_LOCAL`, then use if/else statments to direct puppeteer to the correct environment.
+For example, you can set your code to use an ENV variable such as `IS_LOCAL`, then use if/else statements to direct puppeteer to the correct environment.
 
 ```javascript
 const browser = await puppeteer.launch({
@@ -182,6 +184,68 @@ const browser = await puppeteer.launch({
     : await chromium.executablePath(),
   headless: process.env.IS_LOCAL ? false : chromium.headless,
 });
+```
+
+## Frequently asked questions
+
+### Can I use ARM or Graviton instances?
+
+Amazon's default Lambda base image is quite old at this point and does not support newer versions of `glibc` that chromium requires. When Amazon Linux 2023 comes to Lambda as the default base image, ARM support should be possible. Ref: https://github.com/Sparticuz/chrome-aws-lambda/pull/11, https://github.com/aws/aws-lambda-base-images/issues/59
+
+### Can I use Google Chrome or Chrome for Testing, what is headless_shell?
+
+`headless_shell` is a purpose built version of `chromium` specific for headless purposes. It does not include the GUI at all and only works via remote debugging connection. Ref: https://chromium.googlesource.com/chromium/src/+/lkgr/headless/README.md, https://source.chromium.org/chromium/chromium/src/+/main:headless/app/headless_shell.cc
+
+### Can I use the "new" Headless mode?
+
+From what I can tell, `headless_shell` does not seem to include support for the "new" headless mode.
+
+### It doesn't work with Webpack!?!
+
+Try marking this package as an external. Ref: https://webpack.js.org/configuration/externals/
+
+### I'm experiencing timeouts or failures closing Chromium
+
+This is a common issue. Chromium sometimes opens up more pages than you ask for. You can try the following
+
+```typescript
+for (const page of await browser.pages()) {
+  await page.close();
+}
+await browser.close();
+```
+
+You can also try the following if one of the calls is hanging for some reason.
+
+```typescript
+await Promise.race([browser.close(), browser.close(), browser.close()]);
+```
+
+Always `await browser.close()`, even if your script is returning an error.
+
+### I need Accessible pdf files
+
+This is due to the way @sparticuz/chromium is built. If you require accessible pdf's, you'll need to
+recompile chromium yourself with the following patch. You can then use that binary with @sparticuz/chromium-min.
+
+_Note_: This will increase the time required to generate a PDF.
+
+```patch
+diff --git a/_/ansible/plays/chromium.yml b/_/ansible/plays/chromium.yml
+index b42c740..49111d7 100644
+--- a/_/ansible/plays/chromium.yml
++++ b/_/ansible/plays/chromium.yml
+@@ -249,8 +249,9 @@
+           blink_symbol_level = 0
+           dcheck_always_on = false
+           disable_histogram_support = false
+-          enable_basic_print_dialog = false
+           enable_basic_printing = true
++          enable_pdf = true
++          enable_tagged_pdf = true
+           enable_keystone_registration_framework = false
+           enable_linux_installer = false
+           enable_media_remoting = false
 ```
 
 ## Fonts
@@ -214,7 +278,7 @@ This method should be invoked _before_ launching Chromium.
 
 Alternatively, it's also possible to provision fonts via AWS Lambda Layers.
 
-Simply create a directory named `.fonts` and place any font faces you want there:
+Simply create a directory named `.fonts` or `fonts` and place any font faces you want there:
 
 ```
 .fonts
@@ -225,7 +289,7 @@ Simply create a directory named `.fonts` and place any font faces you want there
 Afterwards, you just need to ZIP the directory and upload it as a AWS Lambda Layer:
 
 ```shell
-zip -9 --filesync --move --recurse-paths .fonts.zip .fonts/
+zip -9 --filesync --move --recurse-paths fonts.zip fonts/
 ```
 
 ## Graphics
@@ -240,8 +304,8 @@ By default, this package uses `swiftshader`/`angle` to do CPU acceleration for W
 | `args`                              | `Array<string>`   | Provides a list of recommended additional [Chromium flags](https://github.com/GoogleChrome/chrome-launcher/blob/master/docs/chrome-flags-for-tools.md). |
 | `defaultViewport`                   | `Object`          | Returns a sensible default viewport for serverless.                                                                                                     |
 | `executablePath(location?: string)` | `Promise<string>` | Returns the path the Chromium binary was extracted to.                                                                                                  |
-| `setHeadlessMode`                   | `void`            | Sets the headless mode to either `true` or `"new"`                                                                                                      |
-| `headless`                          | `true \| "new"`   | Returns `true` or `"new"` depending on what version of chrome's headless you are running                                                                |
+| `setHeadlessMode`                   | `void`            | Sets the headless mode to either `true` or `"shell"`                                                                                                    |
+| `headless`                          | `true \| "shell"` | Returns `true` or `"shell"` depending on what version of chrome's headless you are running                                                              |
 | `setGraphicsMode`                   | `void`            | Sets the graphics mode to either `true` or `false`                                                                                                      |
 | `graphics`                          | `boolean`         | Returns a boolean depending on whether webgl is enabled or disabled                                                                                     |
 

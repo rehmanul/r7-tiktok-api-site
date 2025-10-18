@@ -1,13 +1,11 @@
 // api/tiktok.js - Vercel Serverless Function
-import { chromium } from 'playwright-core';
-import chromiumPkg from '@sparticuz/chromium';
 
 // Hardcoded TikTok cookies - UPDATE THESE PERIODICALLY
 const TIKTOK_COOKIES = [
-  { name: 'sessionid', value: 'YOUR_SESSION_ID_HERE', domain: '.tiktok.com', path: '/' },
+  { name: 'sessionid', value: 'e85eed433bfc35720a51d65c4fd7a174', domain: '.tiktok.com', path: '/' },
   { name: 'tt_webid', value: 'YOUR_WEBID_HERE', domain: '.tiktok.com', path: '/' },
   { name: 'tt_webid_v2', value: 'YOUR_WEBID_V2_HERE', domain: '.tiktok.com', path: '/' },
-  { name: 'msToken', value: 'YOUR_MS_TOKEN_HERE', domain: '.tiktok.com', path: '/' }
+  { name: 'msToken', value: 'fIP-cv0nih4qbA7jIK9cLt9oRZbmpcVFJwzvJzQPjN0n_KDGJMXd6At8hMp6W5foQkGzRe5krq233XRsznxRzKm5XVJZ0kcE18jM4mQSmQSz2dXUJr51TMevVaMA4pJWwUq9dULVG5UgVNVdiV10EqHpFQ==', domain: '.tiktok.com', path: '/' }
 ];
 
 export default async function handler(req, res) {
@@ -53,12 +51,57 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
-    // Launch browser with chromium optimized for serverless
-    const browser = await chromium.launch({
-      args: chromiumPkg.args,
-      executablePath: await chromiumPkg.executablePath(),
-      headless: chromiumPkg.headless,
-    });
+    // Launch browser with environment-specific configuration
+    let browser;
+    // Force local development mode for Windows environment
+    const isServerless = false; // process.env.VERCEL || process.env.AWS_LAMBDA || process.env.LAMBDA_TASK_ROOT;
+    console.log('Environment check:', { isServerless, NODE_ENV: process.env.NODE_ENV, platform: process.platform });
+
+    if (isServerless) {
+      // Serverless environment - use puppeteer-core with serverless chromium
+      const { default: puppeteerCore } = await import('puppeteer-core');
+      const chromiumPkg = await import('@sparticuz/chromium');
+
+      browser = await puppeteerCore.launch({
+        args: [
+          ...chromiumPkg.args,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-ipc-flooding-protection'
+        ],
+        executablePath: await chromiumPkg.executablePath(),
+        headless: true,
+        ignoreDefaultArgs: ['--disable-extensions'],
+        ignoreHTTPSErrors: true,
+        timeout: 60000
+      });
+    } else {
+      // Local development - use regular puppeteer
+      const { default: puppeteerLocal } = await import('puppeteer');
+
+      browser = await puppeteerLocal.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
+        timeout: 60000
+      });
+    }
 
     const context = await browser.newContext({
       viewport: { width: 1920, height: 1080 },
@@ -186,10 +229,27 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Error:', error);
-    return res.status(500).json({
-      error: error.message,
+
+    // Provide more specific error messages for common issues
+    let errorMessage = error.message;
+    let statusCode = 500;
+
+    if (error.message.includes('Browser launch failed')) {
+      errorMessage = 'Browser automation failed - please try again later';
+      statusCode = 503;
+    } else if (error.message.includes('Navigation timeout')) {
+      errorMessage = 'Request timeout - TikTok may be rate limiting';
+      statusCode = 429;
+    } else if (error.message.includes('net::ERR')) {
+      errorMessage = 'Network error - please check the username and try again';
+      statusCode = 400;
+    }
+
+    return res.status(statusCode).json({
+      error: errorMessage,
       status: 'error',
-      code: 500
+      code: statusCode,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
