@@ -26,15 +26,17 @@ the placeholder locally before deploying.
 from __future__ import annotations
 
 import asyncio
+import gzip
 import logging
 import math
 import random
 import time
-from dataclasses import dataclass
+import urllib.error
+import urllib.request
+import zlib
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-import httpx
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -130,7 +132,7 @@ class AdvancedRateLimiter:
 
 
 class TikTokClient:
-    """Thin async HTTP client that fetches TikTok profile pages using cookies."""
+    """Async-friendly TikTok HTML fetcher that relies only on the stdlib."""
 
     def __init__(
         self,
@@ -146,23 +148,12 @@ class TikTokClient:
         self._max_retries = max_retries
         self._backoff_base = backoff_base
         self._semaphore = asyncio.Semaphore(max_concurrent_requests)
-        self._client: Optional[httpx.AsyncClient] = None
 
-    async def start(self) -> None:
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=self._timeout,
-                headers={
-                    "User-Agent": pick_user_agent(),
-                    "Accept-Language": "en-US,en;q=0.9",
-                },
-                http2=True,
-            )
+    async def start(self) -> None:  # pragma: no cover - retained for interface parity
+        return None
 
-    async def close(self) -> None:
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+    async def close(self) -> None:  # pragma: no cover - retained for interface parity
+        return None
 
     async def fetch_user_posts(
         self,
@@ -171,10 +162,6 @@ class TikTokClient:
         max_posts: int,
         cookie_override: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        await self.start()
-        if self._client is None:
-            raise TikTokFetchError("HTTP client not initialised")
-
         cookie = (cookie_override or self._default_cookie or HARDCODED_TIKTOK_COOKIE).strip()
         if not cookie:
             raise TikTokCookieMissing(
@@ -188,22 +175,8 @@ class TikTokClient:
         async with self._semaphore:
             while attempt < self._max_retries:
                 attempt += 1
-                headers = {
-                    "User-Agent": pick_user_agent(),
-                    "Referer": "https://www.tiktok.com/",
-                    "Cookie": cookie,
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Cache-Control": "no-cache",
-                }
                 try:
-                    logger.debug("Fetching TikTok page attempt=%s username=%s", attempt, username)
-                    response = await self._client.get(
-                        url,
-                        headers=headers,
-                        follow_redirects=True,
-                    )
-                    response.raise_for_status()
-                    html = response.text
+                    html = await self._fetch_html(url=url, cookie=cookie)
                     items = parse_embedded_json(html)
                     if not items:
                         raise TikTokFetchError("No embedded JSON found in TikTok page")
@@ -224,6 +197,40 @@ class TikTokClient:
                     await asyncio.sleep(backoff)
 
         raise TikTokFetchError(str(last_error) if last_error else "TikTok fetch failed")
+
+    async def _fetch_html(self, *, url: str, cookie: str) -> str:
+        """Perform the blocking urllib call in a worker thread."""
+
+        def _request() -> str:
+            headers = {
+                "User-Agent": pick_user_agent(),
+                "Referer": "https://www.tiktok.com/",
+                "Cookie": cookie,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "Accept-Encoding": "gzip, deflate",
+            }
+            req = urllib.request.Request(url, headers=headers, method="GET")
+            try:
+                with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                    raw = resp.read()
+                    encoding = resp.headers.get("Content-Encoding", "").lower()
+                    charset = None
+                    if hasattr(resp.headers, "get_content_charset"):
+                        charset = resp.headers.get_content_charset()
+                    if not charset:
+                        content_type = resp.headers.get("Content-Type", "")
+                        if "charset=" in content_type:
+                            charset = content_type.split("charset=")[-1].split(";")[0].strip()
+                    return _decode_body(raw, encoding=encoding, charset=charset or "utf-8")
+            except urllib.error.HTTPError as http_err:
+                raise TikTokFetchError(f"HTTP {http_err.code} while requesting TikTok") from http_err
+            except urllib.error.URLError as url_err:
+                raise TikTokFetchError(f"Network error contacting TikTok: {url_err.reason}") from url_err
+
+        return await asyncio.to_thread(_request)
 
     @staticmethod
     def _normalise_items(
@@ -336,6 +343,22 @@ class TikTokClient:
 # --------------------------------------------------------------------------- #
 # Helper functions
 # --------------------------------------------------------------------------- #
+
+
+def _decode_body(raw: bytes, *, encoding: str, charset: str) -> str:
+    data = raw
+    enc = (encoding or "").lower()
+    try:
+        if "gzip" in enc:
+            data = gzip.decompress(data)
+        elif "deflate" in enc:
+            data = zlib.decompress(data, -zlib.MAX_WBITS)
+    except Exception as exc:  # pragma: no cover - decoding failure edge case
+        logger.debug("Failed to decode body with encoding %s: %s", encoding, exc)
+    try:
+        return data.decode(charset or "utf-8", errors="replace")
+    except LookupError:  # pragma: no cover - unknown charset
+        return data.decode("utf-8", errors="replace")
 
 
 def filter_by_epoch(posts: List[Dict[str, Any]], start_epoch: Optional[int], end_epoch: Optional[int]) -> List[Dict[str, Any]]:

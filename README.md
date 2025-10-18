@@ -1,122 +1,90 @@
-TikTok API - Production
-=======================
+# TikTok Cookie API
 
-This repository contains a production-ready FastAPI service that fetches TikTok posts by scraping TikTok using a browser cookie you provide (no third-party data provider required). The automation in this repo includes Docker, docker-compose, systemd service template, and monitoring configs.
+Minimal FastAPI service that scrapes TikTok directly using a browser cookie you supply.  
+It exposes a single endpoint (`GET /v1/tiktok/posts`) that returns live post metadata for a username with optional pagination and epoch filtering. The code is dependency-light (only FastAPI/Pydantic/Uvicorn plus stdlib) so it runs cleanly on Vercel or any Python host.
 
-Quick start (local, requires Docker):
+## Key Features
+- Real-time scraping – no external data providers or databases.
+- Cookie-driven authentication; override per request with `X-TikTok-Cookie`.
+- Query params: `username` (required), `page`, `per_page`, `start_epoch`, `end_epoch`.
+- Structured response with `meta` block and normalised post fields (id, url, description, views, likes, comments, shares, epoch).
+- Built-in HTML console at `/manage` for quick manual checks.
+- Lightweight in-memory rate limiter and retry/backoff logic.
 
-1. Copy environment example and fill values:
+## Quick Start (local)
+1. **Install deps**
+   ```powershell
+   py -3 -m pip install --upgrade pip
+   py -3 -m pip install -r requirements.txt
+   ```
+2. **Set a TikTok cookie**
+   - Edit `production_api_real.py` and replace `HARDCODED_TIKTOK_COOKIE` with your cookie string **(never commit real cookies)**, or plan to send it via `X-TikTok-Cookie` header at request time.
+3. **Run the API**
+   ```powershell
+   py -3 -m uvicorn production_api_real:app --host 0.0.0.0 --port 8000
+   ```
+4. **Fetch data**
+   ```powershell
+   curl -H "X-TikTok-Cookie: s_v_web_id=...; tt_webid_v2=..." ^
+        "http://localhost:8000/v1/tiktok/posts?username=techreviews&page=1&per_page=10"
+   ```
+5. **Use the console**
+   Visit <http://localhost:8000/manage> to run queries from the browser (paste your cookie if needed).
 
-   cp .env.production.example .env.production
-
-   # edit .env.production and set TIKTOK_COOKIE (optional) and DATABASE_URL
-
-2. Build and start:
-
-   docker-compose build
-   docker-compose up -d
-
-3. Check health:
-
-   curl <http://localhost:8000/health>
-
-CI:
-
-A GitHub Actions workflow is included at `.github/workflows/ci.yml` which runs lint and basic repository checks on push.
-
-Security & Secrets:
-
-- Do NOT commit `.env.production` with real secrets. Use a secret manager or CI secrets.
-- Ports for Postgres and Redis are not published to the host in `docker-compose.yml` to minimize exposure.
-- This deployment is live-data only: there is no caching layer and no database. The app fetches TikTok pages on-demand.
-- You can hardcode a cookie in `.env.production` under `TIKTOK_COOKIE` for convenience, but this is not recommended for security reasons. Prefer Vercel env vars or per-request `X-TikTok-Cookie`.
-
-Files changed by automation:
-
-- `production_api_real.py` — environment-driven config, improved logging and startup handling
-- `Dockerfile` — runs as non-root, adds healthcheck and log dir permissions
-- `docker-compose.yml` — removed host port mappings for DB/Redis and added resource limits for `api`
-- `.dockerignore` — reduce build context
-- `.env.production` sanitized (backup saved as `.env.production.bak`)
-- `README.md` (this file)
-- `.github/workflows/ci.yml` (CI)
-- `tests/test_repo_smoke.py` (basic smoke tests)
-
-Vercel Deployment
------------------
-
-This project can be deployed to Vercel using the Python runtime. A small wrapper is provided at `api/index.py` which exposes the FastAPI `app` to Vercel.
-
-Steps to deploy to Vercel:
-
-1. Sign in to Vercel and create a new project connected to this GitHub repository.
-2. Ensure `requirements.txt` is present (it is in the repo). Vercel will install dependencies from this file.
-3. In the Vercel project settings, add environment variables (do NOT put secrets in the repository):
-    - `TIKTOK_COOKIE` — optional cookie string if you want a global default
-    - `REDIS_HOST`, `REDIS_PORT`, etc., as needed
-4. Deploy. The `vercel.json` config routes all requests to `api/index.py` which serves the FastAPI app.
-
-Notes:
-
-- Serverless functions on Vercel have execution time limits. For long-running EnsembleData fetches or high-concurrency workloads consider deploying to a container platform (K8s) or using Vercel's Advanced/Enterprise options.
-- Local redis/postgres are not available on Vercel; use managed services and set the connection strings in the environment.
-
-Using your own TikTok cookies (no EnsembleData)
----------------------------------------------
-
-This project can use your TikTok browser cookies to fetch pages directly from TikTok instead of relying on EnsembleData.
-
-Two ways to provide cookies:
-
-1) Per-request header: include `X-TikTok-Cookie` with the value from your browser (example: `s_v_web_id=...; tt_webid_v2=...; ...`).
-    Example curl:
-
-```bash
-curl -H "X-API-Key: prod_key_001" -H "X-TikTok-Cookie: 's_v_web_id=...; tt_webid_v2=...; '" \
-   "https://your-vercel-deployment.vercel.app/v1/tiktok/posts?username=someuser"
+## Response Shape
+```jsonc
+{
+  "meta": {
+    "page": 1,
+    "total_pages": 8,
+    "posts_per_page": 10,
+    "total_posts": 76,
+    "start_epoch": 1697068800,
+    "end_epoch": 1729468800,
+    "first_video_epoch": 1729382400,
+    "last_video_epoch": 1697155200,
+    "request_time": 1760758519,
+    "username": "techreviews",
+    "processing_time_ms": 184.32
+  },
+  "data": [
+    {
+      "video_id": "7423156789012345678",
+      "url": "https://www.tiktok.com/@techreviews/video/7423156789012345678",
+      "description": "This new AI gadget is mind-blowing! #tech #AI",
+      "epoch_time_posted": 1729382400,
+      "views": 2847523,
+      "likes": 342891,
+      "comments": 5847,
+      "shares": 28934
+    }
+  ]
+}
 ```
 
-2) Global environment variable: set `TIKTOK_COOKIE` in Vercel Project Settings (Environment Variables). The app will use this cookie as a default client.
-
-How to extract cookies from your browser (Chrome/Chromium):
-
-1. Open Developer Tools (F12) -> Application -> Cookies -> <https://www.tiktok.com>
-2. Copy the cookie key/value pairs and join them with `;` (semicolon + space)
-3. Use the cookie string in the `X-TikTok-Cookie` header or set `TIKTOK_COOKIE` in Vercel.
-
-Caveats & legality:
-
-- Scraping TikTok may violate their terms of service. Ensure you have the right to use and store these cookies. Do not expose other users' private data.
-- Cookies expire and must be refreshed when invalid.
-- Vercel serverless functions have limited execution time — long scraping may fail.
-
-Next steps / Recommendations:
-
-- Rotate any exposed secrets immediately.
-- Use a proper secret manager (Vault, AWS Secrets Manager, Azure Key Vault) for production secrets.
-- Add real integration tests that exercise the app with a running Docker Compose stack.
-- Set up alerting (Sentry is scaffolded) and metrics scraping (Prometheus).
-
-Testing & CI
------------
-
-Unit tests for the parser are included in `tests/test_parser.py`. To run locally:
-
-```powershell
-python -m pip install -r requirements.txt
-pytest -q
+## Tests
 ```
+py -3 -m pytest -q
+```
+Parser tests rely on the shared helper in `production_parser.py` to ensure the same logic is exercised.
 
-GitHub Actions
---------------
+## Deploying to Vercel
+- `vercel.json` routes all traffic to `api/index.py`, which simply re-exports the FastAPI app.
+- GitHub Action `.github/workflows/vercel-deploy.yml` deploys on pushes to `main`. Set repository secrets:
+  - `VERCEL_TOKEN`
+  - `VERCEL_ORG_ID`
+  - `VERCEL_PROJECT_ID`
+- In Vercel project settings add an environment variable `TIKTOK_COOKIE` if you want a global default cookie; otherwise send `X-TikTok-Cookie` per request.
 
-This repository includes a workflow `.github/workflows/vercel-deploy.yml` that will deploy the project to Vercel on pushes to `main`. The workflow requires these repository secrets to be set in GitHub:
+## Security & Operational Notes
+- TikTok cookies are sensitive. Rotate them regularly and keep them out of source control.
+- Scraping may violate TikTok’s terms—ensure you have the right to use the data.
+- Rate limiter is in-memory; scale-out deployments should switch to a shared store (e.g., Redis) if needed.
+- Response accuracy depends on TikTok’s HTML. Parser has multiple fallbacks, but add fixtures/tests whenever layout changes are observed.
 
-- `VERCEL_TOKEN` - your Vercel API token
-- `VERCEL_ORG_ID` - Vercel organization ID
-- `VERCEL_PROJECT_ID` - Vercel project ID
-
-Proxy rotation
---------------
-
-If you expect heavy scraping you may provide a comma-separated `PROXIES` environment variable (e.g. `http://user:pass@proxy1:3128,http://proxy2:3128`) in your runtime environment. The client will rotate proxies per-request when `PROXY_ROTATION` is enabled.
+## Project Structure
+- `production_api_real.py` – FastAPI application + TikTok client.
+- `production_parser.py` – reusable parser helpers used by the app and tests.
+- `api/index.py` – Vercel entrypoint.
+- `tests/test_parser.py` – parser unit tests.
+- `scripts/run_tests.ps1` – optional helper to run tests in a fresh venv.
