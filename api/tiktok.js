@@ -1,13 +1,13 @@
 // api/tiktok.js - Vercel Serverless Function
-import { chromium } from 'playwright-core';
+import puppeteer from 'puppeteer-core';
 import chromiumPkg from '@sparticuz/chromium';
 
 // Hardcoded TikTok cookies - UPDATE THESE PERIODICALLY
 const TIKTOK_COOKIES = [
-  { name: 'sessionid', value: 'YOUR_SESSION_ID_HERE', domain: '.tiktok.com', path: '/' },
+  { name: 'sessionid', value: 'e85eed433bfc35720a51d65c4fd7a174', domain: '.tiktok.com', path: '/' },
   { name: 'tt_webid', value: 'YOUR_WEBID_HERE', domain: '.tiktok.com', path: '/' },
   { name: 'tt_webid_v2', value: 'YOUR_WEBID_V2_HERE', domain: '.tiktok.com', path: '/' },
-  { name: 'msToken', value: 'YOUR_MS_TOKEN_HERE', domain: '.tiktok.com', path: '/' }
+  { name: 'msToken', value: 'fIP-cv0nih4qbA7jIK9cLt9oRZbmpcVFJwzvJzQPjN0n_KDGJMXd6At8hMp6W5foQkGzRe5krq233XRsznxRzKm5XVJZ0kcE18jM4mQSmQSz2dXUJr51TMevVaMA4pJWwUq9dULVG5UgVNVdiV10EqHpFQ==', domain: '.tiktok.com', path: '/' }
 ];
 
 export default async function handler(req, res) {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   try {
     // Extract parameters
-    const { username, page = 1, 'per-page': perPage = 10, start_epoch, end_epoch } = req.query;
+    const { username, page: pageParam = 1, 'per-page': perPage = 10, start_epoch, end_epoch } = req.query;
 
     // Validate required parameters
     if (!username) {
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     }
 
     // Validate pagination parameters
-    const pageNum = parseInt(page);
+    const pageNum = parseInt(pageParam);
     const perPageNum = Math.min(parseInt(perPage), 100);
 
     if (pageNum < 1 || perPageNum < 1) {
@@ -53,11 +53,21 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
-    // Launch browser with chromium optimized for serverless
-    const browser = await chromium.launch({
-      args: chromiumPkg.args,
+    // Launch browser with puppeteer optimized for serverless
+    const browser = await puppeteer.launch({
+      args: [
+        ...chromiumPkg.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu'
+      ],
       executablePath: await chromiumPkg.executablePath(),
-      headless: chromiumPkg.headless,
+      headless: true,
     });
 
     const context = await browser.newContext({

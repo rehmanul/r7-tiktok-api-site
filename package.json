@@ -1,31 +1,19 @@
 {
   "name": "tiktok-api",
   "version": "1.0.0",
-  "description": "TikTok Post Data Retrieval API using Playwright browser automation",
-  "main": "api/tiktok.js",
+  "description": "TikTok data retrieval API on Vercel",
+  "type": "module",
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod",
-    "test": "node -e \"console.log('Tests would go here')\""
+    "dev": "node server.js",
+    "deploy": "vercel --prod"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^112.0.0",
-    "playwright-core": "^1.44.1"
-  },
-  "devDependencies": {
-    "vercel": "^34.1.0"
+    "@sparticuz/chromium": "^123.0.1",
+    "express": "^5.1.0",
+    "playwright-core": "^1.42.0",
+    "puppeteer-core": "^21.6.1"
   },
   "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "tiktok",
-    "api",
-    "scraping",
-    "playwright",
-    "vercel",
-    "serverless"
-  ],
-  "author": "",
-  "license": "MIT"
+    "node": ">=18.x"
+  }
 }
