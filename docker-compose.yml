@@ -12,12 +12,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - TIKTOK_COOKIE=${TIKTOK_COOKIE}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/tiktok_api
-    depends_on:
-      - redis
-      - postgres
+      - DATABASE_URL=
     restart: unless-stopped
     volumes:
       - ./logs:/app/logs
@@ -32,30 +27,7 @@ services:
           cpus: "0.25"
           memory: 256M
 
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: tiktok_redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - tiktok_network
-
-  # PostgreSQL Database (for future features)
-  postgres:
-    image: postgres:15-alpine
-    container_name: tiktok_postgres
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=tiktok_api
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - tiktok_network
+  # (No Redis/Postgres - live data only)
 
   # Nginx Reverse Proxy
   nginx:
@@ -74,22 +46,9 @@ services:
       - tiktok_network
 
   # Redis Commander (Management UI)
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: tiktok_redis_ui
-    environment:
-      - REDIS_HOSTS=local:redis:6379
-    ports:
-      - "8081:8081"
-    depends_on:
-      - redis
-    restart: unless-stopped
-    networks:
-      - tiktok_network
+  # (No redis-commander)
 
-volumes:
-  redis_data:
-  postgres_data:
+volumes: {}
 
 networks:
   tiktok_network:

@@ -28,6 +28,8 @@ Security & Secrets:
 
 - Do NOT commit `.env.production` with real secrets. Use a secret manager or CI secrets.
 - Ports for Postgres and Redis are not published to the host in `docker-compose.yml` to minimize exposure.
+- This deployment is live-data only: there is no caching layer and no database. The app fetches TikTok pages on-demand.
+- You can hardcode a cookie in `.env.production` under `TIKTOK_COOKIE` for convenience, but this is not recommended for security reasons. Prefer Vercel env vars or per-request `X-TikTok-Cookie`.
 
 Files changed by automation:
 

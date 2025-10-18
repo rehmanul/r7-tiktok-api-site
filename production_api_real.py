@@ -7,6 +7,10 @@ import asyncio
 import hashlib
 import logging
 import time
+import asyncio
+import hashlib
+import logging
+import time
 import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
@@ -14,17 +18,11 @@ from collections import defaultdict
 import json
 
 from fastapi import FastAPI, Query, HTTPException, Header, Request, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field, validator
 import httpx
-import aiohttp
-from functools import lru_cache
-import redis.asyncio as aioredis
-
-# ============= LOGGING CONFIGURATION =============
-
 # Minimal logging to stdout at import time. File handler is added at startup
 logging.basicConfig(
     level=logging.INFO,
@@ -79,110 +77,19 @@ class ProductionConfig:
 
 # ============= REDIS CACHE MANAGER =============
 
-class RedisCache:
-    """Redis-based caching with advanced features"""
-
-    def __init__(self):
-        self.redis = None
-        self.enabled = True
-
-    async def connect(self):
-        """Connect to Redis"""
-        try:
-            self.redis = await aioredis.from_url(
-                f"redis://{ProductionConfig.REDIS_HOST}:{ProductionConfig.REDIS_PORT}",
-                password=ProductionConfig.REDIS_PASSWORD,
-                db=ProductionConfig.REDIS_DB,
-                encoding="utf-8",
-                decode_responses=True
-            )
-            await self.redis.ping()
-            logger.info("✅ Redis cache connected")
-        except Exception as e:
-            logger.warning(f"⚠️  Redis unavailable, using in-memory cache: {e}")
-            self.enabled = False
-
-    async def disconnect(self):
-        """Disconnect from Redis"""
-        if self.redis:
-            await self.redis.close()
-
-    def _generate_key(self, prefix: str, **params) -> str:
-        """Generate cache key from parameters"""
-        key_string = f"{prefix}:" + ":".join(f"{k}={v}" for k, v in sorted(params.items()))
-        return hashlib.sha256(key_string.encode()).hexdigest()[:16]
-
-    async def get(self, key: str) -> Optional[Dict]:
-        """Get value from cache"""
-        if not self.enabled or not self.redis:
-            return None
-
-        try:
-            value = await self.redis.get(key)
-            if value:
-                logger.info(f"📦 Cache HIT: {key}")
-                return json.loads(value)
-            logger.info(f"❌ Cache MISS: {key}")
-            return None
-        except Exception as e:
-            logger.error(f"Cache get error: {e}")
-            return None
-
-    async def set(self, key: str, value: Dict, ttl: int = ProductionConfig.CACHE_TTL):
-        """Set value in cache with TTL"""
-        if not self.enabled or not self.redis:
-            return
-
-        try:
-            await self.redis.setex(key, ttl, json.dumps(value))
-            logger.info(f"💾 Cache SET: {key} (TTL: {ttl}s)")
-        except Exception as e:
-            logger.error(f"Cache set error: {e}")
-
-    async def delete(self, pattern: str):
-        """Delete keys matching pattern"""
-        if not self.enabled or not self.redis:
-            return
-
-        try:
-            keys = await self.redis.keys(pattern)
-            if keys:
-                await self.redis.delete(*keys)
-                logger.info(f"🗑️  Deleted {len(keys)} cache keys")
-        except Exception as e:
-            logger.error(f"Cache delete error: {e}")
-
-    async def get_stats(self) -> Dict:
-        """Get cache statistics"""
-        if not self.enabled or not self.redis:
-            return {"enabled": False}
-
-        try:
-            info = await self.redis.info("stats")
-            return {
-                "enabled": True,
-                "total_connections": info.get("total_connections_received", 0),
-                "total_commands": info.get("total_commands_processed", 0),
-                "keyspace_hits": info.get("keyspace_hits", 0),
-                "keyspace_misses": info.get("keyspace_misses", 0),
-                "hit_rate": round(
-                    info.get("keyspace_hits", 0) / 
-                    max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1) * 100, 
-                    2
-                )
-            }
-        except Exception as e:
-            logger.error(f"Cache stats error: {e}")
-            return {"enabled": False, "error": str(e)}
+# Caching removed: live-data only - no Redis cache class
 
 
 # ============= RATE LIMITER =============
 
 class AdvancedRateLimiter:
-    """Token bucket rate limiter with Redis backend"""
+    """Token bucket rate limiter (in-memory token buckets)
 
-    def __init__(self, redis_cache: RedisCache):
-        self.cache = redis_cache
+    Note: This in-memory limiter is per-process and will not coordinate across multiple instances.
+    For production multi-instance setups, replace with a shared store.
+    """
+
+    def __init__(self):
         self.local_buckets = defaultdict(lambda: {"tokens": ProductionConfig.RATE_LIMIT_BURST, "last_update": time.time()})
 
     async def check_limit(self, api_key: str) -> tuple[bool, Dict]:
@@ -421,7 +328,6 @@ if ProductionConfig.ENABLE_COMPRESSION:
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Global instances
-cache: RedisCache = None
 rate_limiter: AdvancedRateLimiter = None
 tiktok_client: TikTokClient = None
 
@@ -455,12 +361,8 @@ async def startup():
     logger.info(f"Version: {ProductionConfig.API_VERSION}")
     logger.info(f"Environment: {ProductionConfig.ENVIRONMENT}")
 
-    # Initialize Redis cache
-    cache = RedisCache()
-    await cache.connect()
-
-    # Initialize rate limiter
-    rate_limiter = AdvancedRateLimiter(cache)
+    # Initialize rate limiter (in-memory)
+    rate_limiter = AdvancedRateLimiter()
     logger.info("✅ Rate limiter initialized")
 
     # Initialize TikTok cookie client (can be overridden per-request via header)
@@ -554,7 +456,6 @@ async def root():
 @app.get("/health", tags=["System"])
 async def health():
     """Health check"""
-    cache_stats = await cache.get_stats() if cache else {"enabled": False}
     tiktok_metrics = tiktok_client.get_metrics() if tiktok_client else {}
 
     return {
@@ -562,10 +463,54 @@ async def health():
         "timestamp": int(time.time()),
         "version": ProductionConfig.API_VERSION,
         "services": {
-            "cache": cache_stats,
-            "tiktok_client": tiktok_metrics
+                        "tiktok_client": tiktok_metrics
         }
     }
+
+
+@app.get("/manage", response_class=HTMLResponse, tags=["Admin"])
+async def manage_ui():
+        """Simple management UI to query usernames and view results (client-side fetch)."""
+        html = """
+        <!doctype html>
+        <html>
+            <head>
+                <meta charset='utf-8'/>
+                <title>TikTok API - Manage</title>
+                <style>
+                    body{font-family: Arial, sans-serif; margin:40px}
+                    input, button {padding:8px; margin:4px}
+                    pre {background:#f6f8fa;padding:12px;border-radius:6px}
+                </style>
+            </head>
+            <body>
+                <h1>TikTok API — Management UI</h1>
+                <p>Enter a username and optional cookie to fetch live posts.</p>
+                <div>
+                    <input id='username' placeholder='username' />
+                    <input id='cookie' placeholder='optional cookie (s_v_web_id=...; ...)'/>
+                    <button onclick='fetchPosts()'>Fetch</button>
+                </div>
+                <div>
+                    <h3>Result</h3>
+                    <pre id='result'>No data</pre>
+                </div>
+                <script>
+                    async function fetchPosts(){
+                        const u=document.getElementById('username').value;
+                        const c=document.getElementById('cookie').value;
+                        if(!u){alert('enter username');return}
+                        const headers={'X-API-Key':'prod_key_001'};
+                        if(c) headers['X-TikTok-Cookie']=c;
+                        const res=await fetch(`/v1/tiktok/posts?username=${encodeURIComponent(u)}`,{headers});
+                        const data=await res.json();
+                        document.getElementById('result').textContent=JSON.stringify(data,null,2);
+                    }
+                </script>
+            </body>
+        </html>
+        """
+        return HTMLResponse(content=html)
 
 
 @app.get("/v1/tiktok/posts", response_model=APIResponse, tags=["TikTok"])
@@ -614,27 +559,7 @@ async def get_posts(
             detail={"error": "BAD_REQUEST", "message": "start_epoch must be <= end_epoch"}
         )
 
-    # Generate cache key
-    cache_key = cache._generate_key(
-        "posts",
-        username=username,
-        start=start_epoch,
-        end=end_epoch,
-        page=page,
-        per_page=per_page
-    )
-
-    # Check cache
-    cached = await cache.get(cache_key)
-    if cached:
-        processing_time = (time.time() - start_time) * 1000
-        cached["meta"]["processing_time_ms"] = round(processing_time, 2)
-        cached["meta"]["cache_hit"] = True
-
-        response = JSONResponse(content=cached)
-        response.headers["X-Cache"] = "HIT"
-        response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
-        return response
+    # No caching (live data only)
 
     # Fetch real data using TikTok cookie client
     try:
@@ -704,10 +629,7 @@ async def get_posts(
             "data": [VideoData(**p).dict() for p in page_posts]
         }
 
-        # Cache response
-        await cache.set(cache_key, response_data)
-
-        # Return with headers
+    # Return with headers
         json_response = JSONResponse(content=response_data)
         json_response.headers["X-Cache"] = "MISS"
         json_response.headers["X-RateLimit-Remaining"] = str(limit_info["remaining"])
