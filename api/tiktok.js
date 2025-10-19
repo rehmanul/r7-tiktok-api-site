@@ -42,13 +42,14 @@ const getCookies = (req) => {
 };
 
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Set CORS and content type headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-TikTok-Cookie');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return res.status(200).json({ status: 'success' });
   }
 
   if (req.method !== 'GET') {
@@ -244,6 +245,13 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Error:', error);
 
+    // Ensure browser is closed in case of error
+    try {
+      if (browser) await browser.close();
+    } catch (closeError) {
+      console.error('Error closing browser:', closeError);
+    }
+
     // Provide more specific error messages for common issues
     let errorMessage = error.message;
     let statusCode = 500;
@@ -259,11 +267,19 @@ export default async function handler(req, res) {
       statusCode = 400;
     }
 
-    return res.status(statusCode).json({
+    // Always return a properly formatted JSON response
+    const errorResponse = {
       error: errorMessage,
       status: 'error',
-      code: statusCode,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+      code: statusCode
+    };
+
+    // Only include stack trace in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.stack;
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(statusCode).json(errorResponse);
   }
 }
