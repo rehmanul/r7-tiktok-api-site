@@ -7,12 +7,9 @@ const port = process.env.PORT || 3000;
 // Middleware to parse JSON
 app.use(express.json());
 
-<<<<<<< HEAD
 // Serve static files from root
 app.use(express.static('.'));
 
-=======
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 // Route for TikTok API
 app.get('/api/tiktok', async (req, res) => {
   try {
@@ -23,7 +20,6 @@ app.get('/api/tiktok', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 // Root route - serve a simple HTML page
 app.get('/', (req, res) => {
   res.send(`
@@ -132,18 +128,10 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     version: '1.0.0'
   });
-=======
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 });
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
-<<<<<<< HEAD
   console.log(`API documentation available at http://localhost:${port}/`);
   console.log(`Health check available at http://localhost:${port}/health`);
-=======
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 });

@@ -1,9 +1,5 @@
 // api/tiktok.js - Vercel Serverless Function
-<<<<<<< HEAD
-=======
-import puppeteer from 'puppeteer-core';
-import chromiumPkg from '@sparticuz/chromium';
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
+import puppeteer from 'puppeteer';
 
 // Hardcoded TikTok cookies - UPDATE THESE PERIODICALLY
 const TIKTOK_COOKIES = [
@@ -56,86 +52,24 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
-<<<<<<< HEAD
-    // Launch browser with environment-specific configuration
-    let browser;
-    // Force local development mode for Windows environment
-    const isServerless = false; // process.env.VERCEL || process.env.AWS_LAMBDA || process.env.LAMBDA_TASK_ROOT;
-    console.log('Environment check:', { isServerless, NODE_ENV: process.env.NODE_ENV, platform: process.platform });
-
-    if (isServerless) {
-      // Serverless environment - use puppeteer-core with serverless chromium
-      const { default: puppeteerCore } = await import('puppeteer-core');
-      const chromiumPkg = await import('@sparticuz/chromium');
-
-      browser = await puppeteerCore.launch({
-        args: [
-          ...chromiumPkg.args,
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-ipc-flooding-protection'
-        ],
-        executablePath: await chromiumPkg.executablePath(),
-        headless: true,
-        ignoreDefaultArgs: ['--disable-extensions'],
-        ignoreHTTPSErrors: true,
-        timeout: 60000
-      });
-    } else {
-      // Local development - use regular puppeteer
-      const { default: puppeteerLocal } = await import('puppeteer');
-
-      browser = await puppeteerLocal.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu'
-        ],
-        timeout: 60000
-      });
-    }
-=======
-    // Launch browser with puppeteer optimized for serverless
+    // Launch browser with puppeteer for local development
     const browser = await puppeteer.launch({
+      headless: true,
       args: [
-        ...chromiumPkg.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--single-process',
         '--disable-gpu'
-      ],
-      executablePath: await chromiumPkg.executablePath(),
-      headless: true,
+      ]
     });
->>>>>>> 1bf9d3cd642846544f483b3bb21a9d6a2dd8337f
 
-    const context = await browser.newContext({
-      viewport: { width: 1920, height: 1080 },
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    });
+    const page = await browser.newPage();
 
     // Add cookies for authentication
-    await context.addCookies(TIKTOK_COOKIES);
-
-    const page = await context.newPage();
+    await page.setCookie(...TIKTOK_COOKIES);
 
     // Track API responses
     const apiResponses = [];
@@ -153,13 +87,17 @@ export default async function handler(req, res) {
     });
 
     // Navigate to user profile
-    await page.goto(`https://www.tiktok.com/@${username}`, {
-      waitUntil: 'networkidle',
-      timeout: 30000
-    });
+    try {
+      await page.goto(`https://www.tiktok.com/@${username}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+    } catch (navError) {
+      console.log('Navigation timeout, continuing with partial load...');
+    }
 
     // Wait for content to load
-    await page.waitForTimeout(3000);
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Extract video data from intercepted API calls
     let allVideos = [];
@@ -172,29 +110,45 @@ export default async function handler(req, res) {
 
     // If no API data, scrape from DOM
     if (allVideos.length === 0) {
-      const videoElements = await page.$$eval('[data-e2e="user-post-item"]', (elements) => {
-        return elements.map(el => {
-          const link = el.querySelector('a');
-          const desc = el.querySelector('[data-e2e="user-post-item-desc"]');
-          return {
-            videoUrl: link ? link.href : null,
-            description: desc ? desc.textContent : ''
-          };
-        });
-      });
+      const videoElements = await page.$$('.css-1as5j2b-DivWrapper, [data-e2e="user-post-item"]');
 
-      allVideos = videoElements;
+      for (const element of videoElements) {
+        try {
+          const videoUrl = await element.$eval('a', el => el.href);
+          const description = await element.$eval('[data-e2e="user-post-item-desc"]', el => el.textContent);
+
+          allVideos.push({
+            videoUrl,
+            description
+          });
+        } catch (e) {
+          // Skip elements that don't match expected structure
+        }
+      }
     }
 
     // Parse and format videos
     const formattedVideos = allVideos.map(video => {
-      const videoId = extractVideoId(video);
-      const createTime = video.createTime || video.create_time || extractTimestampFromVideo(video);
+      // Extract video ID from URL or use fallback
+      let videoId = '';
+      if (video.id) {
+        videoId = video.id;
+      } else if (video.videoUrl) {
+        const match = video.videoUrl.match(/video\/(\d+)/);
+        videoId = match ? match[1] : '';
+      } else {
+        videoId = Math.random().toString(36).substring(2, 15);
+      }
+
+      // Get create time or use current time as fallback
+      const createTime = video.createTime || video.create_time || Math.floor(Date.now() / 1000);
+
+      // Get stats or use empty object as fallback
       const stats = video.stats || {};
 
       return {
         video_id: videoId,
-        url: `https://www.tiktok.com/@${username}/video/${videoId}`,
+        url: video.videoUrl || `https://www.tiktok.com/@${username}/video/${videoId}`,
         description: video.desc || video.description || '',
         epoch_time_posted: createTime,
         views: stats.playCount || stats.play_count || 0,
@@ -225,10 +179,6 @@ export default async function handler(req, res) {
     const endIndex = startIndex + perPageNum;
     const paginatedVideos = filteredVideos.slice(startIndex, endIndex);
 
-    // Calculate first and last video epochs
-    const firstVideoEpoch = filteredVideos.length > 0 ? filteredVideos[0].epoch_time_posted : null;
-    const lastVideoEpoch = filteredVideos.length > 0 ? filteredVideos[filteredVideos.length - 1].epoch_time_posted : null;
-
     await browser.close();
 
     // Build response
@@ -240,8 +190,8 @@ export default async function handler(req, res) {
         total_posts: totalPosts,
         start_epoch: startEpoch,
         end_epoch: endEpoch,
-        first_video_epoch: firstVideoEpoch,
-        last_video_epoch: lastVideoEpoch,
+        first_video_epoch: filteredVideos.length > 0 ? filteredVideos[0].epoch_time_posted : null,
+        last_video_epoch: filteredVideos.length > 0 ? filteredVideos[filteredVideos.length - 1].epoch_time_posted : null,
         request_time: Math.floor(Date.now() / 1000),
         username: username
       },
@@ -276,22 +226,4 @@ export default async function handler(req, res) {
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-}
-
-// Helper function to extract video ID
-function extractVideoId(video) {
-  if (video.id) return video.id;
-  if (video.video_id) return video.video_id;
-  if (video.videoUrl) {
-    const match = video.videoUrl.match(/video\/([0-9]+)/);
-    return match ? match[1] : null;
-  }
-  return null;
-}
-
-// Helper function to extract timestamp
-function extractTimestampFromVideo(video) {
-  if (video.createTime) return video.createTime;
-  if (video.create_time) return video.create_time;
-  return Math.floor(Date.now() / 1000);
 }
