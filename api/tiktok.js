@@ -1,5 +1,6 @@
 // api/tiktok.js - Vercel Serverless Function
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 // Get cookies from environment variable or request header
 const getCookies = (req) => {
@@ -85,23 +86,24 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
-    // Launch browser with puppeteer for serverless environment
+    // Launch browser with puppeteer-core and chromium for Vercel serverless environment
+    const executablePath = await chromium.executablePath();
+
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: chromium.headless,
       args: [
+        ...chromium.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu',
-        '--single-process'
+        '--disable-gpu'
       ],
-      executablePath: process.env.CHROME_BIN || await puppeteer.executablePath(),
-      env: {
-        PUPPETEER_CACHE_DIR: '/tmp/puppeteer'
-      }
+      executablePath,
+      ignoreHTTPSErrors: true,
+      defaultViewport: chromium.defaultViewport
     });
 
     const page = await browser.newPage();
@@ -224,7 +226,7 @@ export default async function handler(req, res) {
 
     // Build response
     const response = {
-      meta: { 
+      meta: {
         page: pageNum,
         total_pages: totalPages,
         posts_per_page: perPageNum,
