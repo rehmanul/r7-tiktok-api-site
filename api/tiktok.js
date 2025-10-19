@@ -52,9 +52,9 @@ export default async function handler(req, res) {
     const startEpoch = start_epoch ? parseInt(start_epoch) : null;
     const endEpoch = end_epoch ? parseInt(end_epoch) : null;
 
-    // Launch browser with puppeteer for local development
+    // Launch browser with puppeteer for serverless environment
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: "new",
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -62,8 +62,13 @@ export default async function handler(req, res) {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu'
-      ]
+        '--disable-gpu',
+        '--single-process'
+      ],
+      executablePath: process.env.CHROME_BIN || await puppeteer.executablePath(),
+      env: {
+        PUPPETEER_CACHE_DIR: '/tmp/puppeteer'
+      }
     });
 
     const page = await browser.newPage();

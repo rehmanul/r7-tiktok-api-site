@@ -7,13 +7,15 @@
   "scripts": {
     "dev": "node server.js",
     "deploy": "vercel --prod",
-    "build": "echo 'Build successful'",
+    "build": "npx puppeteer browsers install chrome && echo 'Build successful'",
     "test": "node --version && echo 'Tests passed'",
-    "lint": "echo 'Lint passed'"
+    "lint": "echo 'Lint passed'",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "express": "^5.1.0",
-    "puppeteer": "^24.25.0"
+    "puppeteer": "^21.5.0",
+    "puppeteer-core": "^21.5.0"
   },
   "engines": {
     "node": ">=18.x"

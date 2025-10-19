@@ -1,9 +1,20 @@
 {
+    "version": 2,
     "functions": {
         "api/tiktok.js": {
-            "memory": 2048,
-            "maxDuration": 30
+            "memory": 3008,
+            "maxDuration": 60
         }
     },
-    "outputDirectory": "."
+    "builds": [
+        { "src": "api/tiktok.js", "use": "@vercel/node" },
+        { "src": "public/**", "use": "@vercel/static" }
+    ],
+    "routes": [
+        { "src": "/api/(.*)", "dest": "api/tiktok.js" },
+        { "src": "/(.*)", "dest": "public/$1" }
+    ],
+    "env": {
+        "PUPPETEER_CACHE_DIR": "/tmp/puppeteer"
+    }
 }
