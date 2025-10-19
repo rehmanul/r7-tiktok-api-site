@@ -12,8 +12,8 @@
     "lint": "echo 'Lint passed'"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^112.0.0",
-    "puppeteer-core": "^24.25.0"
+    "@sparticuz/chromium": "^131.0.0",
+    "puppeteer-core": "^23.11.1"
   },
   "engines": {
     "node": ">=18.x"
