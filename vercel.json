@@ -1,8 +1,11 @@
 {
+    "buildCommand": "echo 'No build required'",
+    "outputDirectory": "public",
+    "installCommand": "npm ci",
     "functions": {
         "api/tiktok.js": {
             "memory": 2048,
-            "maxDuration": 30
+            "maxDuration": 60
         }
     }
 }

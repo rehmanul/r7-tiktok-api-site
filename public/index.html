@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok API</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 { color: #333; }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .endpoint {
+            background: #e8f4f8;
+            padding: 10px;
+            border-left: 4px solid #0070f3;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 TikTok API</h1>
+    <p>Welcome to the TikTok Data Retrieval API</p>
+    
+    <h2>API Endpoint</h2>
+    <div class="endpoint">
+        <strong>GET</strong> <code>/api/tiktok</code>
+    </div>
+    
+    <h3>Parameters</h3>
+    <ul>
+        <li><code>username</code> (required) - TikTok username (without @)</li>
+        <li><code>page</code> (optional) - Page number (default: 1)</li>
+        <li><code>per-page</code> (optional) - Posts per page (default: 10, max: 100)</li>
+        <li><code>start_epoch</code> (optional) - Filter videos after this timestamp</li>
+        <li><code>end_epoch</code> (optional) - Filter videos before this timestamp</li>
+    </ul>
+    
+    <h3>Example Request</h3>
+    <pre><code>GET /api/tiktok?username=example&page=1&per-page=10</code></pre>
+    
+    <h3>Example Response</h3>
+    <pre><code>{
+  "meta": {
+    "page": 1,
+    "total_pages": 5,
+    "posts_per_page": 10,
+    "total_posts": 50,
+    "username": "example"
+  },
+  "data": [
+    {
+      "video_id": "1234567890",
+      "url": "https://www.tiktok.com/@example/video/1234567890",
+      "description": "Video caption here",
+      "epoch_time_posted": 1234567890,
+      "views": 10000,
+      "likes": 500,
+      "comments": 50,
+      "shares": 25
+    }
+  ],
+  "status": "success"
+}</code></pre>
+    
+    <h3>Try It</h3>
+    <p>Test the API by visiting: <code>/api/tiktok?username=test</code></p>
+</body>
+</html>
+
