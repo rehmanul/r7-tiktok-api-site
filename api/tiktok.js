@@ -104,180 +104,180 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
 
-  // Get and set cookies for authentication
-  const cookies = getCookies(req);
-  if (cookies.length > 0) {
-    await page.setCookie(...cookies);
-  }
-
-  // Track API responses
-  const apiResponses = [];
-
-  page.on('response', async (response) => {
-    const url = response.url();
-    if (url.includes('/api/post/item_list/') || url.includes('/api/user/detail/')) {
-      try {
-        const data = await response.json();
-        apiResponses.push({ url, data });
-      } catch (e) {
-        // Ignore non-JSON responses
-      }
+    // Get and set cookies for authentication
+    const cookies = getCookies(req);
+    if (cookies.length > 0) {
+      await page.setCookie(...cookies);
     }
-  });
 
-  // Navigate to user profile
-  try {
-    await page.goto(`https://www.tiktok.com/@${username}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000
+    // Track API responses
+    const apiResponses = [];
+
+    page.on('response', async (response) => {
+      const url = response.url();
+      if (url.includes('/api/post/item_list/') || url.includes('/api/user/detail/')) {
+        try {
+          const data = await response.json();
+          apiResponses.push({ url, data });
+        } catch (e) {
+          // Ignore non-JSON responses
+        }
+      }
     });
-  } catch (navError) {
-    console.log('Navigation timeout, continuing with partial load...');
-  }
 
-  // Wait for content to load
-  await new Promise(resolve => setTimeout(resolve, 5000));
-
-  // Extract video data from intercepted API calls
-  let allVideos = [];
-
-  for (const apiResponse of apiResponses) {
-    if (apiResponse.data.itemList) {
-      allVideos = allVideos.concat(apiResponse.data.itemList);
+    // Navigate to user profile
+    try {
+      await page.goto(`https://www.tiktok.com/@${username}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+    } catch (navError) {
+      console.log('Navigation timeout, continuing with partial load...');
     }
-  }
 
-  // If no API data, scrape from DOM
-  if (allVideos.length === 0) {
-    const videoElements = await page.$$('.css-1as5j2b-DivWrapper, [data-e2e="user-post-item"]');
+    // Wait for content to load
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
-    for (const element of videoElements) {
-      try {
-        const videoUrl = await element.$eval('a', el => el.href);
-        const description = await element.$eval('[data-e2e="user-post-item-desc"]', el => el.textContent);
+    // Extract video data from intercepted API calls
+    let allVideos = [];
 
-        allVideos.push({
-          videoUrl,
-          description
-        });
-      } catch (e) {
-        // Skip elements that don't match expected structure
+    for (const apiResponse of apiResponses) {
+      if (apiResponse.data.itemList) {
+        allVideos = allVideos.concat(apiResponse.data.itemList);
       }
     }
-  }
 
-  // Parse and format videos
-  const formattedVideos = allVideos.map(video => {
-    // Extract video ID from URL or use fallback
-    let videoId = '';
-    if (video.id) {
-      videoId = video.id;
-    } else if (video.videoUrl) {
-      const match = video.videoUrl.match(/video\/(\d+)/);
-      videoId = match ? match[1] : '';
-    } else {
-      videoId = Math.random().toString(36).substring(2, 15);
+    // If no API data, scrape from DOM
+    if (allVideos.length === 0) {
+      const videoElements = await page.$$('.css-1as5j2b-DivWrapper, [data-e2e="user-post-item"]');
+
+      for (const element of videoElements) {
+        try {
+          const videoUrl = await element.$eval('a', el => el.href);
+          const description = await element.$eval('[data-e2e="user-post-item-desc"]', el => el.textContent);
+
+          allVideos.push({
+            videoUrl,
+            description
+          });
+        } catch (e) {
+          // Skip elements that don't match expected structure
+        }
+      }
     }
 
-    // Get create time or use current time as fallback
-    const createTime = video.createTime || video.create_time || Math.floor(Date.now() / 1000);
+    // Parse and format videos
+    const formattedVideos = allVideos.map(video => {
+      // Extract video ID from URL or use fallback
+      let videoId = '';
+      if (video.id) {
+        videoId = video.id;
+      } else if (video.videoUrl) {
+        const match = video.videoUrl.match(/video\/(\d+)/);
+        videoId = match ? match[1] : '';
+      } else {
+        videoId = Math.random().toString(36).substring(2, 15);
+      }
 
-    // Get stats or use empty object as fallback
-    const stats = video.stats || {};
+      // Get create time or use current time as fallback
+      const createTime = video.createTime || video.create_time || Math.floor(Date.now() / 1000);
 
-    return {
-      video_id: videoId,
-      url: video.videoUrl || `https://www.tiktok.com/@${username}/video/${videoId}`,
-      description: video.desc || video.description || '',
-      epoch_time_posted: createTime,
-      views: stats.playCount || stats.play_count || 0,
-      likes: stats.diggCount || stats.like_count || 0,
-      comments: stats.commentCount || stats.comment_count || 0,
-      shares: stats.shareCount || stats.share_count || 0
+      // Get stats or use empty object as fallback
+      const stats = video.stats || {};
+
+      return {
+        video_id: videoId,
+        url: video.videoUrl || `https://www.tiktok.com/@${username}/video/${videoId}`,
+        description: video.desc || video.description || '',
+        epoch_time_posted: createTime,
+        views: stats.playCount || stats.play_count || 0,
+        likes: stats.diggCount || stats.like_count || 0,
+        comments: stats.commentCount || stats.comment_count || 0,
+        shares: stats.shareCount || stats.share_count || 0
+      };
+    });
+
+    // Filter by epoch timestamp
+    let filteredVideos = formattedVideos;
+    if (startEpoch || endEpoch) {
+      filteredVideos = formattedVideos.filter(video => {
+        const videoTime = video.epoch_time_posted;
+        if (startEpoch && videoTime < startEpoch) return false;
+        if (endEpoch && videoTime > endEpoch) return false;
+        return true;
+      });
+    }
+
+    // Sort by epoch time (most recent first)
+    filteredVideos.sort((a, b) => b.epoch_time_posted - a.epoch_time_posted);
+
+    // Calculate pagination
+    const totalPosts = filteredVideos.length;
+    const totalPages = Math.ceil(totalPosts / perPageNum);
+    const startIndex = (pageNum - 1) * perPageNum;
+    const endIndex = startIndex + perPageNum;
+    const paginatedVideos = filteredVideos.slice(startIndex, endIndex);
+
+    await browser.close();
+
+    // Build response
+    const response = {
+      meta: {
+        page: pageNum,
+        total_pages: totalPages,
+        posts_per_page: perPageNum,
+        total_posts: totalPosts,
+        start_epoch: startEpoch,
+        end_epoch: endEpoch,
+        first_video_epoch: filteredVideos.length > 0 ? filteredVideos[0].epoch_time_posted : null,
+        last_video_epoch: filteredVideos.length > 0 ? filteredVideos[filteredVideos.length - 1].epoch_time_posted : null,
+        request_time: Math.floor(Date.now() / 1000),
+        username: username
+      },
+      data: paginatedVideos,
+      status: 'success'
     };
-  });
 
-  // Filter by epoch timestamp
-  let filteredVideos = formattedVideos;
-  if (startEpoch || endEpoch) {
-    filteredVideos = formattedVideos.filter(video => {
-      const videoTime = video.epoch_time_posted;
-      if (startEpoch && videoTime < startEpoch) return false;
-      if (endEpoch && videoTime > endEpoch) return false;
-      return true;
-    });
+    return res.status(200).json(response);
+
+  } catch (error) {
+    console.error('Error:', error);
+
+    // Ensure browser is closed in case of error
+    try {
+      if (browser) await browser.close();
+    } catch (closeError) {
+      console.error('Error closing browser:', closeError);
+    }
+
+    // Provide more specific error messages for common issues
+    let errorMessage = error.message;
+    let statusCode = 500;
+
+    if (error.message.includes('Browser launch failed')) {
+      errorMessage = 'Browser automation failed - please try again later';
+      statusCode = 503;
+    } else if (error.message.includes('Navigation timeout')) {
+      errorMessage = 'Request timeout - TikTok may be rate limiting';
+      statusCode = 429;
+    } else if (error.message.includes('net::ERR')) {
+      errorMessage = 'Network error - please check the username and try again';
+      statusCode = 400;
+    }
+
+    // Always return a properly formatted JSON response
+    const errorResponse = {
+      error: errorMessage,
+      status: 'error',
+      code: statusCode
+    };
+
+    // Only include stack trace in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.details = error.stack;
+    }
+
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(statusCode).json(errorResponse);
   }
-
-  // Sort by epoch time (most recent first)
-  filteredVideos.sort((a, b) => b.epoch_time_posted - a.epoch_time_posted);
-
-  // Calculate pagination
-  const totalPosts = filteredVideos.length;
-  const totalPages = Math.ceil(totalPosts / perPageNum);
-  const startIndex = (pageNum - 1) * perPageNum;
-  const endIndex = startIndex + perPageNum;
-  const paginatedVideos = filteredVideos.slice(startIndex, endIndex);
-
-  await browser.close();
-
-  // Build response
-  const response = {
-    meta: {
-      page: pageNum,
-      total_pages: totalPages,
-      posts_per_page: perPageNum,
-      total_posts: totalPosts,
-      start_epoch: startEpoch,
-      end_epoch: endEpoch,
-      first_video_epoch: filteredVideos.length > 0 ? filteredVideos[0].epoch_time_posted : null,
-      last_video_epoch: filteredVideos.length > 0 ? filteredVideos[filteredVideos.length - 1].epoch_time_posted : null,
-      request_time: Math.floor(Date.now() / 1000),
-      username: username
-    },
-    data: paginatedVideos,
-    status: 'success'
-  };
-
-  return res.status(200).json(response);
-
-} catch (error) {
-  console.error('Error:', error);
-
-  // Ensure browser is closed in case of error
-  try {
-    if (browser) await browser.close();
-  } catch (closeError) {
-    console.error('Error closing browser:', closeError);
-  }
-
-  // Provide more specific error messages for common issues
-  let errorMessage = error.message;
-  let statusCode = 500;
-
-  if (error.message.includes('Browser launch failed')) {
-    errorMessage = 'Browser automation failed - please try again later';
-    statusCode = 503;
-  } else if (error.message.includes('Navigation timeout')) {
-    errorMessage = 'Request timeout - TikTok may be rate limiting';
-    statusCode = 429;
-  } else if (error.message.includes('net::ERR')) {
-    errorMessage = 'Network error - please check the username and try again';
-    statusCode = 400;
-  }
-
-  // Always return a properly formatted JSON response
-  const errorResponse = {
-    error: errorMessage,
-    status: 'error',
-    code: statusCode
-  };
-
-  // Only include stack trace in development
-  if (process.env.NODE_ENV === 'development') {
-    errorResponse.details = error.stack;
-  }
-
-  res.setHeader('Content-Type', 'application/json');
-  return res.status(statusCode).json(errorResponse);
-}
 }

@@ -3,8 +3,16 @@
     "outputDirectory": "public",
     "functions": {
         "api/tiktok.js": {
-            "memory": 2048,
+            "memory": 3008,
             "maxDuration": 60
         }
+    },
+    "build": {
+        "env": {
+            "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+        }
+    },
+    "env": {
+        "CHROME_PATH": "/tmp/chromium"
     }
 }
