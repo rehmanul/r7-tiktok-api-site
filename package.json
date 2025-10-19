@@ -15,8 +15,8 @@
     "@sparticuz/chromium": "^123.0.1",
     "express": "^5.1.0",
     "playwright-core": "^1.42.0",
-    "puppeteer-core": "^21.6.1",
-    "puppeteer": "^21.6.1"
+    "puppeteer": "^21.11.0",
+    "puppeteer-core": "^21.6.1"
   },
   "engines": {
     "node": ">=18.x"
