@@ -1,19 +1,51 @@
 // api/tiktok.js - Vercel Serverless Function
 import puppeteer from 'puppeteer';
 
-// Hardcoded TikTok cookies - UPDATE THESE PERIODICALLY
-const TIKTOK_COOKIES = [
-  { name: 'sessionid', value: 'e85eed433bfc35720a51d65c4fd7a174', domain: '.tiktok.com', path: '/' },
-  { name: 'tt_webid', value: 'YOUR_WEBID_HERE', domain: '.tiktok.com', path: '/' },
-  { name: 'tt_webid_v2', value: 'YOUR_WEBID_V2_HERE', domain: '.tiktok.com', path: '/' },
-  { name: 'msToken', value: 'fIP-cv0nih4qbA7jIK9cLt9oRZbmpcVFJwzvJzQPjN0n_KDGJMXd6At8hMp6W5foQkGzRe5krq233XRsznxRzKm5XVJZ0kcE18jM4mQSmQSz2dXUJr51TMevVaMA4pJWwUq9dULVG5UgVNVdiV10EqHpFQ==', domain: '.tiktok.com', path: '/' }
-];
+// Get cookies from environment variable or request header
+const getCookies = (req) => {
+  // First try to get from request header
+  const cookieHeader = req.headers['x-tiktok-cookie'] || '';
+
+  // If header exists, parse it
+  if (cookieHeader) {
+    try {
+      const cookieStr = Buffer.from(cookieHeader, 'base64').toString('utf-8');
+      const cookiePairs = cookieStr.split(';').map(pair => pair.trim());
+      return cookiePairs.map(pair => {
+        const [name, value] = pair.split('=');
+        return { name, value, domain: '.tiktok.com', path: '/' };
+      });
+    } catch (e) {
+      console.error('Error parsing cookie header:', e);
+    }
+  }
+
+  // Fallback to environment variable
+  const envCookie = process.env.TIKTOK_COOKIE || '';
+  if (envCookie) {
+    try {
+      const cookiePairs = envCookie.split(';').map(pair => pair.trim());
+      return cookiePairs.map(pair => {
+        const [name, value] = pair.split('=');
+        return { name, value, domain: '.tiktok.com', path: '/' };
+      });
+    } catch (e) {
+      console.error('Error parsing environment cookie:', e);
+    }
+  }
+
+  // Default cookies as last resort
+  return [
+    { name: 'sessionid', value: process.env.TIKTOK_SESSION_ID || '', domain: '.tiktok.com', path: '/' },
+    { name: 'tt_webid', value: process.env.TIKTOK_WEBID || '', domain: '.tiktok.com', path: '/' }
+  ];
+};
 
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-TikTok-Cookie');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -73,8 +105,11 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
 
-    // Add cookies for authentication
-    await page.setCookie(...TIKTOK_COOKIES);
+    // Get and set cookies for authentication
+    const cookies = getCookies(req);
+    if (cookies.length > 0) {
+      await page.setCookie(...cookies);
+    }
 
     // Track API responses
     const apiResponses = [];
