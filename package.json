@@ -5,17 +5,15 @@
   "type": "module",
   "main": "api/tiktok.js",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "build": "npx puppeteer browsers install chrome && echo 'Build successful'",
+    "build": "echo 'Build successful'",
     "test": "node --version && echo 'Tests passed'",
-    "lint": "echo 'Lint passed'",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "lint": "echo 'Lint passed'"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "puppeteer": "^21.5.0",
-    "puppeteer-core": "^21.5.0"
+    "@sparticuz/chromium": "^112.0.0",
+    "puppeteer-core": "^24.25.0"
   },
   "engines": {
     "node": ">=18.x"

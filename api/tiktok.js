@@ -223,7 +223,7 @@ export default async function handler(req, res) {
 
     // Build response
     const response = {
-      meta: {
+      meta: { 
         page: pageNum,
         total_pages: totalPages,
         posts_per_page: perPageNum,
