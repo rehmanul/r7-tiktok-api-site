@@ -1,5 +1,6 @@
 // api/tiktok.js - Vercel Serverless Function
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 // Get cookies from environment variable or request header
 const getCookies = (req) => {
@@ -86,21 +87,10 @@ export default async function handler(req, res) {
 
     // Launch browser with puppeteer for serverless environment
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
-        '--single-process'
-      ],
-      executablePath: process.env.CHROME_BIN || await puppeteer.executablePath(),
-      env: {
-        PUPPETEER_CACHE_DIR: '/tmp/puppeteer'
-      }
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless
     });
 
     const page = await browser.newPage();
