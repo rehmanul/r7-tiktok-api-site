@@ -1,6 +1,6 @@
 # TikTok API System
 
-A production-ready Node.js API for retrieving TikTok posts by username. The service runs on Node 18, uses real Chromium automation via `puppeteer-core` + `@sparticuz/chromium`, and ships with configurable rate limiting, server-side caching, and first-class Docker/Vercel support.
+A production-ready Node.js API for retrieving TikTok posts by username. The service runs on Node 22, uses real Chromium automation via `puppeteer-core` + `@sparticuz/chromium`, and ships with configurable rate limiting, server-side caching, and first-class Docker/Vercel support.
 
 ## Highlights
 
@@ -10,14 +10,14 @@ A production-ready Node.js API for retrieving TikTok posts by username. The serv
 - Time range filtering (`start_epoch` / `end_epoch`) and pagination (`page`, `per-page`)
 - Secure cookie handling through the `X-TikTok-Cookie` header or environment variables
 - Express server with Helmet, compression, structured logging, and a bundled web UI for manual testing
-- Works on Vercel’s `nodejs18.x` runtime and ships with a hardened Dockerfile + Compose stack
+- Works on Vercel’s `nodejs22.x` runtime and ships with a hardened Dockerfile + Compose stack
 
 ## Requirements
 
 | Tool | Version |
 |------|---------|
-| Node.js | 18.x |
-| npm | 9.x (bundled with Node 18) |
+| Node.js | 22.x |
+| npm | 10.x (bundled with Node 22) |
 | Optional | Docker 24+ with Compose V2 |
 
 ## Quick Start (Node)
@@ -133,7 +133,7 @@ Fields without TikTok data are returned as `null` rather than synthetic defaults
 
 ## Deployment (Vercel)
 
-- Runtime: `nodejs18.x` (configured in `vercel.json`)
+- Runtime: `nodejs22.x` (configured in `vercel.json`)
 - Build command: `npm ci`
 - Memory: `2048` MB (Hobby plan maximum; upgrade to Vercel Pro or Teams to raise it)
 - Ensure `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true` is set (already in `vercel.json`)
@@ -144,10 +144,10 @@ Fields without TikTok data are returned as `null` rather than synthetic defaults
 
 | Symptom | Likely Cause | Resolution |
 |---------|-------------|------------|
-| `Chromium executable path not available` | Missing system dependencies or incompatible runtime | Deploy on Node 18 / use provided Dockerfile |
+| `Chromium executable path not available` | Missing system dependencies or incompatible runtime | Deploy on Node 22 / use provided Dockerfile |
 | `Rate limit exceeded` (429) | Client exceeded configured limits | Inspect `X-RateLimit-*` headers and adjust env values |
 | Empty `data` array | Private account or missing cookies | Provide valid TikTok cookies via env or request header |
-| Vercel build warns about Node 18 | Keep `package.json` and `vercel.json` set to Node 18 (Hobby plan requirement) |
+| Vercel build warns about Node 22 | Keep `package.json` and `vercel.json` set to Node 22 (Hobby plan requirement) |
 
 ## License
 

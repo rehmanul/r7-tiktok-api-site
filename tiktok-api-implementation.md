@@ -1,6 +1,6 @@
 # TikTok Post Data Retrieval API - Complete Implementation Guide
 
-> **Update (October 2025):** The live system now runs on Node.js 18 with `puppeteer-core`, in-memory caching, and enhanced rate limiting. The guide below has been partially updated for consistency, but for authoritative setup instructions see `README.md`.
+> **Update (October 2025):** The live system now runs on Node.js 22 with `puppeteer-core`, in-memory caching, and enhanced rate limiting. The guide below has been partially updated for consistency, but for authoritative setup instructions see `README.md`.
 
 ## Project Overview
 This is a production-ready serverless API that retrieves TikTok post details based on username with time-based filtering capabilities. The API is deployed on Vercel and uses browser automation with Playwright to scrape real-time data from TikTok.
@@ -10,7 +10,7 @@ This is a production-ready serverless API that retrieves TikTok post details bas
 ## Technical Architecture
 
 ### Technology Stack
-- **Runtime**: Node.js 18+
+- **Runtime**: Node.js 22+
 - **Platform**: Vercel Serverless Functions
 - **Browser Automation**: Playwright Core + Chromium
 - **Authentication**: TikTok session cookies (hardcoded)
@@ -365,7 +365,7 @@ function extractTimestampFromVideo(video) {
     "vercel": "^48.4.1"
   },
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   }
 }
 ```
@@ -378,7 +378,7 @@ function extractTimestampFromVideo(video) {
     "api/tiktok.js": {
       "memory": 2048,
       "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs22.x"
     }
   }
 }
@@ -657,6 +657,8 @@ This TikTok API provides a robust, production-ready solution for extracting TikT
 - ✅ Scalable serverless infrastructure
 
 For questions or issues, refer to the troubleshooting section or check Vercel function logs.
+
+
 
 
 

@@ -120,7 +120,7 @@ The API uses **TikTok session cookies** for authentication. These cookies are:
 - **Memory**: 2048MB (Hobby plan limit)
 - **Timeout**: 60 seconds per request
 - **Browser**: Puppeteer with Chromium (optimized for serverless)
-- **Runtime**: Node.js 18.x
+- **Runtime**: Node.js 22.x
 - **Framework**: Express.js (local testing)
 
 ---

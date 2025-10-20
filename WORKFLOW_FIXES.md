@@ -25,7 +25,7 @@ All GitHub Actions workflows were configured for **Python** but your project is 
 
 ### ✅ Created (Node.js):
 1. `.github/workflows/tests.yml` - Multi-version Node.js testing
-   - Tests on Node 18.x and 20.x
+   - Tests on Node 22.x and 20.x
    - Ensures compatibility across versions
 
 2. **Removed**: `.github/workflows/deploy.yml`
