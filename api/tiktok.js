@@ -835,6 +835,14 @@ export default async function handler(req, res) {
     });
   }
 
+  if (typeof startEpoch === 'number' && typeof endEpoch === 'number' && startEpoch > endEpoch) {
+    return res.status(400).json({
+      error: '`start_epoch` must be less than or equal to `end_epoch`',
+      status: 'error',
+      code: 400
+    });
+  }
+
   const cookies = getCookies(req);
   const cacheKey = createCacheKey({ username, page: pageNum, perPage: perPageNum, startEpoch, endEpoch, cookies });
 
@@ -911,12 +919,29 @@ export default async function handler(req, res) {
     let statusCode = 500;
     let message = 'Unexpected error while processing the request';
 
+    const loweredMessage = error.message.toLowerCase();
+
     if (/timeout/i.test(error.message)) {
       statusCode = 504;
       message = 'Timed out while loading TikTok. Please retry.';
     } else if (/executable path not available/i.test(error.message)) {
       statusCode = 503;
       message = 'Chromium executable not available in the current environment.';
+    } else if (
+      loweredMessage.includes('target closed') ||
+      loweredMessage.includes('execution context was destroyed') ||
+      loweredMessage.includes('navigation failed because browser has disconnected')
+    ) {
+      statusCode = 503;
+      message =
+        'TikTok blocked the automated browser. Provide valid session cookies via X-TikTok-Cookie header or environment variable.';
+    } else if (loweredMessage.includes('too many requests') || loweredMessage.includes('429')) {
+      statusCode = 429;
+      message = 'TikTok rate limited the request. Please wait before retrying.';
+    } else if (loweredMessage.includes('net::err_http_response_code_failure')) {
+      statusCode = 502;
+      message =
+        'TikTok refused the request. Provide valid TikTok cookies or verify the profile is accessible from your region.';
     }
 
     const errorResponse = {
