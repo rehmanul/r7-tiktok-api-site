@@ -94,9 +94,17 @@ export default async function handler(req, res) {
         ...chromium.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-dev-tools',
+        '--js-flags="--max-old-space-size=1536"'
       ],
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: {
+        width: 1280,
+        height: 800,
+        deviceScaleFactor: 1
+      },
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
       ignoreHTTPSErrors: true
