@@ -858,6 +858,8 @@ export default async function handler(req, res) {
   let browser;
   let page;
 
+  const missingCookies = cookies.length === 0;
+
   try {
     browser = await createBrowser();
     page = await browser.newPage();
@@ -921,12 +923,22 @@ export default async function handler(req, res) {
 
     const loweredMessage = error.message.toLowerCase();
 
+    const hints = [];
+
+    if (missingCookies) {
+      hints.push(
+        'No TikTok cookies detected. Supply session cookies via the X-TikTok-Cookie header or TIKTOK_COOKIE environment variable for reliable access.'
+      );
+    }
+
     if (/timeout/i.test(error.message)) {
       statusCode = 504;
       message = 'Timed out while loading TikTok. Please retry.';
+      hints.push('TikTok can be slow to respond—retry with a smaller per-page value or later in time.');
     } else if (/executable path not available/i.test(error.message)) {
       statusCode = 503;
       message = 'Chromium executable not available in the current environment.';
+      hints.push('Verify that @sparticuz/chromium is installed and Vercel functions are allowed to download Chromium.');
     } else if (
       loweredMessage.includes('target closed') ||
       loweredMessage.includes('execution context was destroyed') ||
@@ -935,13 +947,19 @@ export default async function handler(req, res) {
       statusCode = 503;
       message =
         'TikTok blocked the automated browser. Provide valid session cookies via X-TikTok-Cookie header or environment variable.';
+      hints.push('TikTok often blocks anonymous scraping. Re-use cookies from an authenticated browser session.');
     } else if (loweredMessage.includes('too many requests') || loweredMessage.includes('429')) {
       statusCode = 429;
       message = 'TikTok rate limited the request. Please wait before retrying.';
+      hints.push('Implement exponential backoff and avoid sending requests more frequently than once every few seconds.');
     } else if (loweredMessage.includes('net::err_http_response_code_failure')) {
       statusCode = 502;
       message =
         'TikTok refused the request. Provide valid TikTok cookies or verify the profile is accessible from your region.';
+      hints.push('If the profile is geo-restricted, route traffic through a region where it is accessible.');
+    } else if (statusCode === 500 && error.message) {
+      const sanitized = error.message.split('\n')[0];
+      message = `Unexpected error while processing the request: ${sanitized}`;
     }
 
     const errorResponse = {
@@ -949,6 +967,10 @@ export default async function handler(req, res) {
       status: 'error',
       code: statusCode
     };
+
+    if (hints.length) {
+      errorResponse.hints = hints;
+    }
 
     if (process.env.NODE_ENV === 'development') {
       errorResponse.details = error.stack;
