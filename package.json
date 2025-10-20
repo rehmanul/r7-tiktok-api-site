@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "build": "chmod +x api/_lib/chrome-deps.sh && ./api/_lib/chrome-deps.sh",
+    "build": "chmod +x build.sh && ./build.sh",
     "test": "node --version && echo 'Tests passed'",
     "lint": "echo 'Lint passed'"
   },

@@ -1,10 +1,11 @@
 {
-    "buildCommand": "echo 'Build complete'",
+    "buildCommand": "yum install -y amazon-linux-extras && amazon-linux-extras install epel -y && yum install -y chromium chromium-headless chromium-libs nss cups-libs atk at-spi2-atk libXcomposite libXcursor libXdamage libXext libXi libXrandr libXScrnSaver libXtst pango alsa-lib && echo 'Build complete'",
     "outputDirectory": "public",
     "functions": {
         "api/tiktok.js": {
             "memory": 2048,
-            "maxDuration": 60
+            "maxDuration": 60,
+            "runtime": "nodejs18.x"
         }
     },
     "build": {
@@ -13,6 +14,7 @@
         }
     },
     "env": {
-        "CHROME_PATH": "/tmp/chromium"
+        "CHROME_PATH": "/usr/bin/chromium-browser",
+        "CHROME_EXECUTABLE": "/usr/bin/chromium-browser"
     }
 }
