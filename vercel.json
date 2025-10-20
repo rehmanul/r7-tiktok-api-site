@@ -1,7 +1,5 @@
 {
     "version": 2,
-    "buildCommand": "npm ci",
-    "outputDirectory": "public",
     "build": {
         "env": {
             "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
