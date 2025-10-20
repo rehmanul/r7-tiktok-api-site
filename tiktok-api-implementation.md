@@ -1,5 +1,7 @@
 # TikTok Post Data Retrieval API - Complete Implementation Guide
 
+> **Update (October 2025):** The live system now runs on Node.js 22 with `puppeteer-core`, in-memory caching, and enhanced rate limiting. The guide below has been partially updated for consistency, but for authoritative setup instructions see `README.md`.
+
 ## Project Overview
 This is a production-ready serverless API that retrieves TikTok post details based on username with time-based filtering capabilities. The API is deployed on Vercel and uses browser automation with Playwright to scrape real-time data from TikTok.
 
@@ -331,9 +333,9 @@ function extractVideoId(video) {
 
 // Helper function to extract timestamp
 function extractTimestampFromVideo(video) {
-  if (video.createTime) return video.createTime;
-  if (video.create_time) return video.create_time;
-  return Math.floor(Date.now() / 1000);
+  if (typeof video.createTime === "number") return video.createTime;
+  if (typeof video.create_time === "number") return video.create_time;
+  return null;
 }
 ```
 
@@ -347,14 +349,23 @@ function extractTimestampFromVideo(video) {
   "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "build": "echo Build complete",
+    "start": "node server.js"
   },
   "dependencies": {
-    "playwright-core": "^1.42.0",
-    "@sparticuz/chromium": "^123.0.1"
+    "@sparticuz/chromium": "^121.0.0",
+    "compression": "^1.8.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "puppeteer-core": "^21.5.0"
+  },
+  "devDependencies": {
+    "vercel": "^48.4.1"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": "22.x"
   }
 }
 ```
@@ -367,7 +378,7 @@ function extractTimestampFromVideo(video) {
     "api/tiktok.js": {
       "memory": 3008,
       "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs22.x"
     }
   }
 }

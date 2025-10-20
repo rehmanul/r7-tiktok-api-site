@@ -447,7 +447,8 @@
             const cachedResult = cache.get(cacheKey);
             if (cachedResult && (Date.now() - cachedResult.timestamp) < CACHE_DURATION) {
                 showToast('Loading data from cache');
-                displayResults(cachedResult.data);
+                displayResults(cachedResult.data, cachedResult.headers);
+                showResponseTime(startTime);
                 return;
             }
 
@@ -462,10 +463,14 @@
                 });
 
                 if (formData.startDate) {
-                    params.append('start_epoch', Math.floor(new Date(formData.startDate).getTime() / 1000));
+                    const startDate = new Date(formData.startDate);
+                    startDate.setHours(0, 0, 0, 0);
+                    params.append('start_epoch', Math.floor(startDate.getTime() / 1000));
                 }
                 if (formData.endDate) {
-                    params.append('end_epoch', Math.floor(new Date(formData.endDate).getTime() / 1000));
+                    const endDate = new Date(formData.endDate);
+                    endDate.setHours(23, 59, 59, 999);
+                    params.append('end_epoch', Math.floor(endDate.getTime() / 1000));
                 }
 
                 // Prepare request
@@ -479,19 +484,22 @@
                 }
 
                 const response = await fetch(url, { headers });
+                const headerInfo = extractHeaderInfo(response);
                 const data = await response.json();
 
-                if (data.status === 'error') {
-                    throw new Error(data.error || 'Failed to fetch videos');
+                if (!response.ok || data.status === 'error') {
+                    const message = data?.error || `Request failed with status ${response.status}`;
+                    throw new Error(message);
                 }
 
                 // Cache the result
                 cache.set(cacheKey, {
                     data,
+                    headers: headerInfo,
                     timestamp: Date.now()
                 });
 
-                displayResults(data);
+                displayResults(data, headerInfo);
                 showResponseTime(startTime);
 
             } catch (error) {
@@ -508,24 +516,58 @@
             }
         });
 
-        function displayResults(data) {
+        function extractHeaderInfo(response) {
+            const get = (name) => response.headers.get(name);
+            const toNumber = (value) => {
+                if (value === null || value === undefined) {
+                    return null;
+                }
+                const num = Number(value);
+                return Number.isNaN(num) ? null : num;
+            };
+            const buildBucket = (prefix) => ({
+                limit: toNumber(get(`X-RateLimit-Limit-${prefix}`)),
+                remaining: toNumber(get(`X-RateLimit-Remaining-${prefix}`)),
+                reset: toNumber(get(`X-RateLimit-Reset-${prefix}`))
+            });
+            return {
+                cacheStatus: get('X-Cache'),
+                cacheExpiresIn: toNumber(get('X-Cache-Expires-In')),
+                rateLimit: {
+                    minute: buildBucket('Minute'),
+                    hour: buildBucket('Hour')
+                }
+            };
+        }
+
+        function displayResults(data, headerInfo = {}) {
             // Display meta information
             if (data.meta) {
+                const cacheStatus = headerInfo.cacheStatus || data.meta.cache_status || 'unknown';
+                const cacheExpires = headerInfo.cacheExpiresIn ? `${headerInfo.cacheExpiresIn}s` : '';
+                const minuteLimit = formatRateLimit(headerInfo.rateLimit?.minute);
+                const hourLimit = formatRateLimit(headerInfo.rateLimit?.hour);
+
                 metaInfoDiv.innerHTML = `
                     <div class="meta-info">
                         <div class="meta-stat">
                             <h3>📊 @${data.meta.username}</h3>
-                            <p>Total Posts: ${data.meta.total_posts}</p>
+                            <p>Total Posts: ${formatNumber(data.meta.total_posts)}</p>
+                            <p>Page ${formatNumber(data.meta.page)} of ${formatNumber(data.meta.total_pages)}</p>
+                            <p>${formatNumber(data.meta.posts_per_page)} posts per page</p>
                         </div>
                         <div class="meta-stat">
                             <h3>📅 Time Range</h3>
-                            <p>First: ${new Date(data.meta.first_video_epoch * 1000).toLocaleDateString()}</p>
-                            <p>Last: ${new Date(data.meta.last_video_epoch * 1000).toLocaleDateString()}</p>
+                            <p>Start filter: ${formatDateFromEpoch(data.meta.start_epoch)}</p>
+                            <p>End filter: ${formatDateFromEpoch(data.meta.end_epoch)}</p>
+                            <p>Latest post: ${formatDateFromEpoch(data.meta.first_video_epoch)}</p>
+                            <p>Oldest post: ${formatDateFromEpoch(data.meta.last_video_epoch)}</p>
                         </div>
                         <div class="meta-stat">
-                            <h3>📈 Statistics</h3>
-                            <p>Page ${data.meta.page} of ${data.meta.total_pages}</p>
-                            <p>${data.meta.posts_per_page} posts per page</p>
+                            <h3>🛡️ Limits & Cache</h3>
+                            <p>Cache: ${cacheStatus}${cacheExpires ? ` (expires in ${cacheExpires})` : ''}</p>
+                            <p>Minute limit: ${minuteLimit}</p>
+                            <p>Hour limit: ${hourLimit}</p>
                         </div>
                     </div>
                 `;
@@ -562,7 +604,7 @@
                             </div>
                         </div>
                         <div class="video-footer">
-                            <small>Posted: ${new Date(video.epoch_time_posted * 1000).toLocaleString()}</small>
+                            <small>Posted: ${formatDateFromEpoch(video.epoch_time_posted)}</small>
                         </div>
                     </div>
                 `).join('');
@@ -571,14 +613,45 @@
             }
         }
 
-        function formatNumber(num) {
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
+        function formatRateLimit(bucket) {
+            if (!bucket || bucket.limit === null) {
+                return 'n/a';
             }
-            if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
+            const remaining = bucket.remaining !== null ? bucket.remaining : '—';
+            const limit = bucket.limit !== null ? bucket.limit : '—';
+            const resetText =
+                bucket.reset !== null && bucket.reset !== undefined
+                    ? ` (resets at ${new Date(bucket.reset * 1000).toLocaleTimeString()})`
+                    : '';
+            return `${remaining}/${limit}${resetText}`;
+        }
+
+        function formatDateFromEpoch(epoch) {
+            if (epoch === null || epoch === undefined) {
+                return '—';
             }
-            return num.toString();
+            const num = Number(epoch);
+            if (Number.isNaN(num) || num <= 0) {
+                return '—';
+            }
+            return new Date(num * 1000).toLocaleString();
+        }
+
+        function formatNumber(value) {
+            if (value === null || value === undefined) {
+                return '—';
+            }
+            const num = typeof value === 'number' ? value : Number(value);
+            if (!Number.isFinite(num)) {
+                return '—';
+            }
+            if (num >= 1_000_000) {
+                return `${(num / 1_000_000).toFixed(1)}M`;
+            }
+            if (num >= 1_000) {
+                return `${(num / 1_000).toFixed(1)}K`;
+            }
+            return num.toLocaleString();
         }
 
         function copyToClipboard(text) {

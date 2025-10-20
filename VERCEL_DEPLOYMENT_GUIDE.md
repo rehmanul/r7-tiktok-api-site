@@ -11,11 +11,12 @@ Vercel has **built-in GitHub integration** that automatically deploys your proje
    - Click "Add New Project"
    - Import your GitHub repository: `Jkratz01/tiktok-api-site`
    - Vercel will auto-detect it's a Node.js project
-3. **Configure Settings** (optional):
+3. **Configure Settings** (recommended):
    - Framework Preset: Other
-   - Build Command: `npm run build`
-   - Output Directory: Leave empty (API functions)
+   - Build Command: `npm run build` (runs a lightweight sanity check)
    - Install Command: `npm ci`
+   - Output Directory: leave empty (serverless functions only)
+   - Node.js Version: `22.x` (Project Settings → General → Node.js Version)
 4. **Deploy**: Click "Deploy"
 
 ### What Happens Automatically:

@@ -1,38 +1,71 @@
-FROM python:3.11-slim
+# syntax=docker/dockerfile:1.7
 
-# Set working directory
+FROM node:22-slim AS deps
 WORKDIR /app
 
-# Install system dependencies needed for runtime
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:22-slim AS runner
+WORKDIR /app
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    fonts-liberation \
+    libasound2 \
+    libatk1.0-0 \
+    libcairo2 \
+    libcups2 \
+    libdbus-1-3 \
+    libdrm2 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user for running the app
-RUN useradd --create-home --home-dir /nonroot -M nonroot || true
+ENV NODE_ENV=production \
+    PORT=3000
 
-# Copy requirements
-COPY requirements_prod.txt /app/
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY api ./api
+COPY public ./public
+COPY server.js ./server.js
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/requirements_prod.txt
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 runner && \
+    chown -R runner:nodejs /app
 
-# Copy application code
-COPY production_api_real.py /app/
+USER runner
 
-# Create logs directory and set permissions
-RUN mkdir -p /app/logs && chown -R nonroot:nonroot /app/logs /app
+EXPOSE 3000
 
-# Switch to non-root user
-USER nonroot
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:3000/health').then(res=>{if(res.ok)process.exit(0);process.exit(1);}).catch(()=>process.exit(1));"
 
-# Expose port
-EXPOSE 8000
-
-# Health check - use curl if available
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run with gunicorn for production
-CMD ["gunicorn", "production_api_real:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log", "--log-level", "info"]
+CMD ["node", "server.js"]

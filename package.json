@@ -7,13 +7,22 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "build": "echo 'Build complete'",
+    "build": "echo Build complete",
+    "start": "node server.js",
+    "serve": "node server.js",
     "test": "node --version && echo 'Tests passed'",
     "lint": "echo 'Lint passed'"
   },
   "dependencies": {
     "@sparticuz/chromium": "^121.0.0",
+    "compression": "^1.8.1",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
     "puppeteer-core": "^21.5.0"
+  },
+  "devDependencies": {
+    "vercel": "^48.4.1"
   },
   "engines": {
     "node": "22.x"

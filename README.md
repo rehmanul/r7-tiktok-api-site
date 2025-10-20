@@ -1,175 +1,153 @@
-# TikTok API - Node.js Implementation
+# TikTok API System
 
-A production-ready serverless API that retrieves TikTok post details based on username with time-based filtering capabilities. Built with Node.js, Playwright, and Vercel.
+A production-ready Node.js API for retrieving TikTok posts by username. The service runs on Node 22, uses real Chromium automation via `puppeteer-core` + `@sparticuz/chromium`, and ships with configurable rate limiting, server-side caching, and first-class Docker/Vercel support.
 
-## Features
+## Highlights
 
-- ✅ **Serverless Architecture**: Deployed on Vercel with automatic scaling
-- ✅ **Browser Automation**: Uses Playwright with Chromium for reliable data extraction
-- ✅ **Cookie Authentication**: Supports TikTok session cookies for authenticated requests
-- ✅ **Pagination & Filtering**: Time-based filtering with pagination support
-- ✅ **Rate Limiting**: Built-in rate limiting to prevent abuse
-- ✅ **CORS Support**: Cross-origin requests enabled
-- ✅ **Error Handling**: Comprehensive error handling with meaningful messages
+- Headless Chromium scraping with robust DOM/API parsing (no mocked data or placeholders)
+- Configurable rate limiting (per-minute and per-hour windows) surfaced via response headers
+- In-memory response cache with TTL and bounded size
+- Time range filtering (`start_epoch` / `end_epoch`) and pagination (`page`, `per-page`)
+- Secure cookie handling through the `X-TikTok-Cookie` header or environment variables
+- Express server with Helmet, compression, structured logging, and a bundled web UI for manual testing
+- Works on Vercel’s `nodejs22.x` runtime and ships with a hardened Dockerfile + Compose stack
 
-## Quick Start
+## Requirements
 
-### 1. Install Dependencies
+| Tool | Version |
+|------|---------|
+| Node.js | 22.x |
+| npm | 10.x (bundled with Node 22) |
+| Optional | Docker 24+ with Compose V2 |
+
+## Quick Start (Node)
+
 ```bash
-npm install
+npm ci
+cp env.production.example .env.production    # fill in values
+npm start                                    # http://localhost:3000
 ```
 
-### 2. Set Environment Variables
-Create a `.env.local` file or set in Vercel dashboard:
+Visit `http://localhost:3000/` for the bundled dashboard or query the API directly at `http://localhost:3000/api/tiktok`.
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TIKTOK_COOKIE` | Full TikTok cookie string or JSON array encoded as text | empty |
+| `TIKTOK_SESSION_ID` | Fallback session cookie if `TIKTOK_COOKIE` is empty | empty |
+| `TIKTOK_WEBID` | Fallback `tt_webid` cookie if `TIKTOK_COOKIE` is empty | empty |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | Requests allowed in a rolling minute (set `0` to disable) | `60` |
+| `RATE_LIMIT_REQUESTS_PER_HOUR` | Requests allowed per hour (set `0` to disable) | `1000` |
+| `CACHE_TTL` | Cache lifetime in seconds (set `0` to disable caching) | `120` |
+| `CACHE_MAX_ENTRIES` | Max cached responses stored in memory | `100` |
+| `NAVIGATION_TIMEOUT_MS` | Puppeteer navigation timeout | `30000` |
+| `CONTENT_WAIT_MS` | Wait after load before scraping | `5000` |
+| `PORT` | HTTP port used in local/Docker setups | `3000` |
+
+Cookies can be supplied per request with the `X-TikTok-Cookie` header (base64 encoded string or JSON cookie array). Environment values act as defaults when the header is omitted.
+
+## Running with Docker
+
 ```bash
-TIKTOK_COOKIES=[{"domain":".tiktok.com","name":"sessionid","value":"your_session_id",...}]
+cp env.production.example .env.production    # configure values
+docker compose --env-file .env.production up -d
+# API → http://localhost:3000, UI → http://localhost:3000/
 ```
 
-### 3. Run Locally
+The Dockerfile installs all Chromium runtime dependencies, runs the app as a non-root user, and exposes a health check at `/health`.
+
+## API Reference
+
+**Endpoint**
+```
+GET /api/tiktok
+```
+
+**Query Parameters**
+| Name | Required | Description |
+|------|----------|-------------|
+| `username` | ✅ | TikTok username without `@` |
+| `page` | ❌ | 1-based page index (default `1`) |
+| `per-page` | ❌ | Page size (`1`–`100`, default `10`) |
+| `start_epoch` | ❌ | Return posts created at or after this Unix timestamp |
+| `end_epoch` | ❌ | Return posts created at or before this Unix timestamp |
+
+**Headers**
+- `X-TikTok-Cookie` (optional): Base64 encoded cookie string or JSON array; overrides env values for the request.
+- Response headers expose rate limiting and cache metadata:
+  - `X-RateLimit-Limit-Minute`, `X-RateLimit-Remaining-Minute`, `X-RateLimit-Reset-Minute`
+  - `X-RateLimit-Limit-Hour`, `X-RateLimit-Remaining-Hour`, `X-RateLimit-Reset-Hour`
+  - `X-Cache` (`MISS`, `HIT`, or `DISABLED`) and `X-Cache-Expires-In`
+
+**Example**
 ```bash
-npm run dev
+curl "http://localhost:3000/api/tiktok?username=tiktok&per-page=5" \
+  -H "Accept: application/json"
 ```
 
-### 4. Deploy to Vercel
-```bash
-npm run deploy
-```
-
-## API Usage
-
-### Endpoint
-```
-GET https://your-project.vercel.app/api/tiktok
-```
-
-### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `username` | string | ✅ Yes | - | TikTok username to scrape |
-| `page` | integer | ❌ No | 1 | Page number for pagination |
-| `per-page` | integer | ❌ No | 10 | Posts per page (max: 100) |
-| `start_epoch` | integer | ❌ No | - | Unix timestamp filter start |
-| `end_epoch` | integer | ❌ No | - | Unix timestamp filter end |
-
-### Headers
-```
-X-TikTok-Cookie: [JSON cookie array or cookie string] (optional)
-```
-
-### Example Requests
-
-**Basic Request:**
-```bash
-curl "https://your-api.vercel.app/api/tiktok?username=techreviews"
-```
-
-**With Pagination:**
-```bash
-curl "https://your-api.vercel.app/api/tiktok?username=techreviews&page=2&per-page=20"
-```
-
-**With Time Filters:**
-```bash
-curl "https://your-api.vercel.app/api/tiktok?username=techreviews&start_epoch=1697068800&end_epoch=1729468800"
-```
-
-### Response Format
-
+**Sample Response**
 ```json
 {
   "meta": {
+    "username": "tiktok",
     "page": 1,
-    "total_pages": 8,
-    "posts_per_page": 10,
-    "total_posts": 76,
-    "start_epoch": 1697068800,
-    "end_epoch": 1729468800,
-    "first_video_epoch": 1729382400,
-    "last_video_epoch": 1697155200,
-    "request_time": 1729468800,
-    "username": "techreviews"
+    "total_pages": 3,
+    "posts_per_page": 5,
+    "total_posts": 15,
+    "start_epoch": null,
+    "end_epoch": null,
+    "first_video_epoch": 1729446293,
+    "last_video_epoch": 1727010241,
+    "request_time": 1729621200,
+    "cache_status": "MISS"
   },
   "data": [
     {
-      "video_id": "7423156789012345678",
-      "url": "https://www.tiktok.com/@techreviews/video/7423156789012345678",
-      "description": "This new AI gadget is mind-blowing! 🤯 #tech #AI #productivity",
-      "epoch_time_posted": 1729382400,
-      "views": 2847523,
-      "likes": 342891,
-      "comments": 5847,
-      "shares": 28934
+      "video_id": "7423567890123456789",
+      "url": "https://www.tiktok.com/@tiktok/video/7423567890123456789",
+      "description": "Launching something new 👀",
+      "epoch_time_posted": 1729446293,
+      "views": 5320101,
+      "likes": 823411,
+      "comments": 17920,
+      "shares": 42013
     }
   ],
   "status": "success"
 }
 ```
+Fields without TikTok data are returned as `null` rather than synthetic defaults.
 
-## Configuration
+## Rate Limiting & Caching
 
-### Environment Variables
-- `TIKTOK_COOKIES`: JSON array of TikTok cookies (required for production)
+- Rate limits are enforced per client IP across minute/hour windows. Setting an environment variable to `0` disables that window.
+- The in-memory cache stores up to `CACHE_MAX_ENTRIES` responses per unique `(username, pagination, epoch filters, cookie)` tuple. TTL is controlled via `CACHE_TTL`. Set to `0` to disable caching entirely.
 
-### Vercel Configuration
-The `vercel.json` includes:
-- Memory allocation: 3008 MB
-- Max duration: 60 seconds
-- Node.js runtime
+## Local Dashboard
 
-## Security Considerations
+`public/index.html` (served at `/`) provides a polished UI for testing:
+- Username search with pagination and optional date filters
+- Client-side caching to prevent redundant requests
+- Displays server cache status, rate limit headers, and response times
 
-1. **Never commit cookies** to version control
-2. **Use environment variables** for production cookies
-3. **Implement rate limiting** (built-in)
-4. **Monitor Vercel logs** for suspicious activity
-5. **Rotate cookies regularly**
+## Deployment (Vercel)
+
+- Runtime: `nodejs22.x` (configured in `vercel.json`)
+- Build command: `npm ci`
+- Ensure `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true` is set (already in `vercel.json`)
+- Configure environment variables in the Vercel dashboard identical to `.env.production`
+- Deploy via Git integration or `vercel --prod`
 
 ## Troubleshooting
 
-### Common Issues
-
-**"Browser launch failed"**
-- Increase memory in `vercel.json`
-- Check Vercel function logs
-
-**"User not found"**
-- Verify username is correct
-- Check if profile is private
-- Ensure cookies are valid
-
-**"Timeout"**
-- Increase `maxDuration` in `vercel.json`
-- Optimize scraping logic
-
-**"Invalid response"**
-- TikTok may have changed their structure
-- Update parsing logic in `api/tiktok.js`
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| Cold start | 10-20 seconds |
-| Warm request | 5-10 seconds |
-| Memory usage | 1.5-2.5 GB |
-| Max duration | 60 seconds |
-| Concurrent requests | Unlimited |
-
-## Architecture
-
-```
-Client Request → Vercel Edge Network → Serverless Function →
-Playwright Browser → TikTok Website → Data Extraction →
-Filtering & Pagination → JSON Response
-```
-
-## Dependencies
-
-- `@sparticuz/chromium`: Chromium binary for serverless environments
-- `playwright-core`: Browser automation framework
-- `vercel`: Deployment platform
+| Symptom | Likely Cause | Resolution |
+|---------|-------------|------------|
+| `Chromium executable path not available` | Missing system dependencies or incompatible runtime | Deploy on Node 22 / use provided Dockerfile |
+| `Rate limit exceeded` (429) | Client exceeded configured limits | Inspect `X-RateLimit-*` headers and adjust env values |
+| Empty `data` array | Private account or missing cookies | Provide valid TikTok cookies via env or request header |
+| Vercel build warns about Node 18 | Ensure `package.json` and `vercel.json` both target Node 22 |
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License. See `LICENSE` for details.

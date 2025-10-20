@@ -4,15 +4,15 @@
     "outputDirectory": "public",
     "functions": {
         "api/tiktok.js": {
-            "memory": 2048,
+            "memory": 3008,
             "maxDuration": 60,
-            "runtime": "@vercel/node@3.0.0"
+            "runtime": "nodejs22.x"
         }
     },
     "build": {
         "env": {
             "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-            "NODE_VERSION": "18.x"
+            "NODE_VERSION": "22.x"
         }
     }
 }

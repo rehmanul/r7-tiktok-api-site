@@ -1,73 +1,50 @@
 #!/bin/bash
 
-# Production Deployment Script
-set -e
+set -euo pipefail
 
-echo "========================================"
-echo "TikTok API - Production Deployment"
-echo "========================================"
+ENV_FILE="${ENV_FILE:-.env.production}"
 
-# Check if .env.production exists
-if [ ! -f .env.production ]; then
-    echo "❌ Error: .env.production not found"
-    echo "Please copy .env.production.example and configure it"
-    exit 1
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: Docker is required but was not found in PATH."
+  exit 1
 fi
 
-# Load environment variables
-export $(cat .env.production | xargs)
-
-# Optional: check for TIKTOK_COOKIE presence
-if grep -q "^TIKTOK_COOKIE=" .env.production; then
-    echo "TIKTOK_COOKIE found in .env.production (will be used as default cookie)"
-else
-    echo "Note: TIKTOK_COOKIE not found in .env.production. You can supply cookies per-request via X-TikTok-Cookie header or set TIKTOK_COOKIE in env."
+if ! command -v docker compose >/dev/null 2>&1; then
+  echo "ERROR: Docker Compose V2 is required (docker compose)."
+  exit 1
 fi
 
-echo ""
-echo "✅ Environment validated (basic checks)"
+if [ ! -f "${ENV_FILE}" ]; then
+  echo "ERROR: Environment file '${ENV_FILE}' not found."
+  echo "   Create one (e.g. copy env.production.example) before deploying."
+  exit 1
+fi
+
+echo "Deploying TikTok API using Docker Compose"
+echo "-------------------------------------------"
+echo "Environment file: ${ENV_FILE}"
 echo ""
 
-# Pull latest images
-echo "📥 Pulling Docker images..."
-docker-compose pull
+echo "[1/4] Building image..."
+docker compose --env-file "${ENV_FILE}" build
 
-# Build application
-echo "🔨 Building application..."
-docker-compose build
+echo "[2/4] Stopping existing containers..."
+docker compose --env-file "${ENV_FILE}" down --remove-orphans
 
-# Stop existing containers
-echo "🛑 Stopping existing containers..."
-docker-compose down
+echo "[3/4] Starting services..."
+docker compose --env-file "${ENV_FILE}" up -d
 
-# Start services
-echo "🚀 Starting services..."
-docker-compose up -d
+echo "[4/4] Waiting for health check..."
+for attempt in {1..10}; do
+  if curl -fsS "http://localhost:${PORT:-3000}/health" >/dev/null 2>&1; then
+    echo "API is healthy."
+    docker compose --env-file "${ENV_FILE}" ps
+    exit 0
+  fi
+  echo "Waiting for service to become healthy (attempt ${attempt}/10)..."
+  sleep 3
+done
 
-# Wait for services to be healthy
-echo ""
-echo "⏳ Waiting for services to start..."
-sleep 10
-
-# Check health
-echo ""
-echo "🏥 Checking service health..."
-curl -f http://localhost:8000/health || echo "⚠️  API not responding yet"
-
-echo ""
-echo "========================================"
-echo "✅ Deployment Complete!"
-echo "========================================"
-echo ""
-echo "Services running:"
-echo "  - API: http://localhost:8000"
-echo "  - API Docs: http://localhost:8000/api/docs"
-echo "  - Nginx: http://localhost:80"
-echo "  - Redis UI: http://localhost:8081"
-echo ""
-echo "View logs:"
-echo "  docker-compose logs -f api"
-echo ""
-echo "Check status:"
-echo "  docker-compose ps"
-echo ""
+echo "WARNING: API health check did not succeed. Inspect logs with:"
+echo "    docker compose --env-file \"${ENV_FILE}\" logs -f"
+exit 1

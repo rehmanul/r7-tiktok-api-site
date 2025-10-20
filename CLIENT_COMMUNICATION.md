@@ -117,10 +117,10 @@ The API uses **TikTok session cookies** for authentication. These cookies are:
 ## ⚙️ Technical Specifications
 
 - **Hosting**: Vercel Serverless Functions
-- **Memory**: 2048MB (Vercel Hobby plan limit)
-- **Timeout**: 30 seconds per request
+- **Memory**: 3008MB (per `vercel.json`)
+- **Timeout**: 60 seconds per request
 - **Browser**: Puppeteer with Chromium (optimized for serverless)
-- **Runtime**: Node.js 18.x
+- **Runtime**: Node.js 22.x
 - **Framework**: Express.js (local testing)
 
 ---
