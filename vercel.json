@@ -1,7 +1,8 @@
 {
     "version": 2,
-    "buildCommand": "chmod +x build.sh && ./build.sh",
+    "buildCommand": "npm ci",
     "outputDirectory": "public",
+    "framework": "node",
     "functions": {
         "api/tiktok.js": {
             "memory": 2048,
@@ -11,11 +12,8 @@
     },
     "build": {
         "env": {
-            "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true"
+            "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+            "NODE_VERSION": "18.x"
         }
-    },
-    "env": {
-        "CHROME_PATH": "/usr/bin/chromium-browser",
-        "CHROME_EXECUTABLE": "/usr/bin/chromium-browser"
     }
 }

@@ -252,10 +252,14 @@ export default async function handler(req, res) {
     console.error('Error:', error);
 
     // Ensure browser is closed in case of error
-    try {
-      if (browser) await browser.close();
-    } catch (closeError) {
-      console.error('Error closing browser:', closeError);
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError);
+      } finally {
+        browser = null;
+      }
     }
 
     // Provide more specific error messages for common issues

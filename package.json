@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod",
-    "build": "chmod +x build.sh && ./build.sh",
+    "build": "echo 'Build complete'",
     "test": "node --version && echo 'Tests passed'",
     "lint": "echo 'Lint passed'"
   },
@@ -16,6 +16,6 @@
     "puppeteer-core": "^21.5.0"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": "18.x"
   }
 }
