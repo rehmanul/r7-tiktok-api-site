@@ -14,12 +14,12 @@
     "lint": "echo 'Lint passed'"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^121.0.0",
+    "@sparticuz/chromium": "^123.0.0",
     "compression": "^1.8.1",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
-    "puppeteer-core": "^21.5.0"
+    "puppeteer-core": "^22.10.0"
   },
   "devDependencies": {
     "vercel": "^48.4.1"

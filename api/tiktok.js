@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import fs from 'fs';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 
@@ -22,6 +23,24 @@ const rateLimitState = new Map();
 const responseCache = new Map();
 
 let cachedExecutablePath;
+
+function ensureChromiumCacheDir() {
+  const defaultCache = '/tmp/chromium-cache';
+  const targetDir = process.env.PUPPETEER_CACHE_DIR || defaultCache;
+  process.env.PUPPETEER_CACHE_DIR = targetDir;
+
+  if (!targetDir.startsWith('/tmp')) {
+    return;
+  }
+
+  try {
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true, mode: 0o755 });
+    }
+  } catch (err) {
+    console.warn('Unable to ensure chromium cache directory:', err);
+  }
+}
 
 function normalizeInteger(rawValue, fallback) {
   if (rawValue === undefined || rawValue === null || rawValue === '') {
@@ -370,6 +389,8 @@ async function resolveExecutablePath() {
 }
 
 async function createBrowser() {
+  ensureChromiumCacheDir();
+
   const executablePath = await resolveExecutablePath();
 
   return puppeteer.launch({
@@ -939,6 +960,13 @@ export default async function handler(req, res) {
       statusCode = 503;
       message = 'Chromium executable not available in the current environment.';
       hints.push('Verify that @sparticuz/chromium is installed and Vercel functions are allowed to download Chromium.');
+    } else if (loweredMessage.includes('failed to launch the browser process')) {
+      statusCode = 503;
+      message = 'Failed to launch Chromium in the Vercel environment.';
+      hints.push(
+        'Clear the function cache and redeploy so @sparticuz/chromium can download a fresh binary.'
+      );
+      hints.push('Confirm PUPPETEER_CACHE_DIR points to a writable location (default /tmp/chromium-cache).');
     } else if (
       loweredMessage.includes('target closed') ||
       loweredMessage.includes('execution context was destroyed') ||
