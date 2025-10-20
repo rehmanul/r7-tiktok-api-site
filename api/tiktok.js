@@ -19,6 +19,18 @@ const CACHE_MAX_ENTRIES = (() => {
 })();
 const CACHE_ENABLED = CACHE_TTL_MS > 0 && CACHE_MAX_ENTRIES > 0;
 
+const HTTP_FETCH_TIMEOUT_MS = normalizeInteger(process.env.HTTP_FETCH_TIMEOUT_MS, 12_000);
+const HTTP_MAX_RETRIES = Math.max(normalizeInteger(process.env.HTTP_MAX_RETRIES, 3), 1);
+const HTTP_ITEM_LIST_PAGE_SIZE = (() => {
+  const raw = normalizeInteger(process.env.TIKTOK_ITEM_LIST_PAGE_SIZE, 30);
+  if (Number.isNaN(raw)) {
+    return 30;
+  }
+  return Math.min(Math.max(raw, 1), 35);
+})();
+const HTTP_ITEM_LIST_MAX_PAGES = Math.max(normalizeInteger(process.env.TIKTOK_ITEM_LIST_MAX_PAGES, 40), 1);
+const HTTP_ITEM_LIST_BUFFER_PAGES = Math.max(normalizeInteger(process.env.TIKTOK_ITEM_LIST_BUFFER_PAGES, 2), 1);
+
 const RATE_LIMIT_RULES = buildRateLimitRules();
 const rateLimitState = new Map();
 const responseCache = new Map();
@@ -245,6 +257,133 @@ function getCookies(req) {
   return unique;
 }
 
+function createCookieMap(initialCookies = []) {
+  const map = new Map();
+  if (Array.isArray(initialCookies)) {
+    initialCookies.forEach((cookie) => {
+      if (cookie && cookie.name && cookie.value) {
+        map.set(cookie.name.trim(), cookie.value.trim());
+      }
+    });
+  }
+  return map;
+}
+
+function serializeCookieMap(cookieMap) {
+  if (!(cookieMap instanceof Map) || cookieMap.size === 0) {
+    return '';
+  }
+  const segments = [];
+  cookieMap.forEach((value, name) => {
+    if (name && value) {
+      segments.push(`${name}=${value}`);
+    }
+  });
+  return segments.join('; ');
+}
+
+function applySetCookieHeaders(cookieMap, setCookieHeaders) {
+  if (!(cookieMap instanceof Map) || !Array.isArray(setCookieHeaders)) {
+    return;
+  }
+  setCookieHeaders.forEach((header) => {
+    if (typeof header !== 'string' || !header.trim()) {
+      return;
+    }
+    const [pair] = header.split(';');
+    const [rawName, ...rest] = pair.split('=');
+    const name = rawName?.trim();
+    const value = rest.join('=').trim();
+    if (name && value) {
+      cookieMap.set(name, value);
+    }
+  });
+}
+
+function buildHtmlRequestHeaders({ cookieHeader, referer } = {}) {
+  const headers = {
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Ch-Ua': '"Chromium";v="122", "Not A(Brand";v="24", "Google Chrome";v="122"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'Upgrade-Insecure-Requests': '1',
+    'User-Agent': DEFAULT_USER_AGENT
+  };
+
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader;
+  }
+
+  if (referer) {
+    headers.Referer = referer;
+  }
+
+  return headers;
+}
+
+function buildApiRequestHeaders({ cookieHeader, referer } = {}) {
+  const headers = {
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Content-Type': 'application/json',
+    Origin: 'https://www.tiktok.com',
+    'Sec-Ch-Ua': '"Chromium";v="122", "Not A(Brand";v="24", "Google Chrome";v="122"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'User-Agent': DEFAULT_USER_AGENT
+  };
+
+  if (cookieHeader) {
+    headers.Cookie = cookieHeader;
+  }
+
+  if (referer) {
+    headers.Referer = referer;
+  }
+
+  return headers;
+}
+
+function extractUniversalDataFromHtml(html) {
+  if (typeof html !== 'string' || !html.includes('__UNIVERSAL_DATA_FOR_REHYDRATION__')) {
+    throw new Error('TikTok profile page did not contain expected universal data script tag');
+  }
+  const marker = '<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">';
+  const start = html.indexOf(marker);
+  if (start === -1) {
+    throw new Error('Unable to locate universal data payload in TikTok profile page');
+  }
+  const end = html.indexOf('</script>', start);
+  if (end === -1) {
+    throw new Error('Incomplete universal data payload detected on TikTok profile page');
+  }
+  const payload = html.slice(start + marker.length, end);
+  return JSON.parse(payload);
+}
+
+function extractUserInfoFromUniversalData(universalData, username) {
+  const scope = universalData?.__DEFAULT_SCOPE__?.['webapp.user-detail'];
+  const userInfo = scope?.userInfo;
+  if (!userInfo?.user?.secUid) {
+    throw new Error(`Unable to resolve user information for ${username}`);
+  }
+  return userInfo;
+}
+
+function detectUnavailableInHtml(html) {
+  if (typeof html !== 'string') {
+    return false;
+  }
+  const lowered = html.toLowerCase();
+  return (
+    lowered.includes("couldn't find this account") ||
+    lowered.includes('account is private') ||
+    lowered.includes('does not have any content yet') ||
+    lowered.includes('no content yet')
+  );
+}
+
 function getClientIdentifier(req) {
   const candidates = [
     req.headers['cf-connecting-ip'],
@@ -376,6 +515,323 @@ function storeCachedResponse(cacheKey, payload) {
     payload: clonePayload(payload),
     expiresAt: Date.now() + CACHE_TTL_MS
   });
+}
+
+async function fetchWithRetry(url, options = {}) {
+  const {
+    timeoutMs = HTTP_FETCH_TIMEOUT_MS,
+    maxAttempts = HTTP_MAX_RETRIES,
+    retryOn = [429, 500, 502, 503, 504],
+    ...fetchOptions
+  } = options;
+
+  let attempt = 0;
+  let lastError;
+
+  while (attempt < maxAttempts) {
+    attempt += 1;
+
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+      clearTimeout(timeoutHandle);
+
+      if (retryOn.includes(response.status) && attempt < maxAttempts) {
+        await delay(200 * attempt);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutHandle);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt >= maxAttempts) {
+        break;
+      }
+      await delay(200 * attempt);
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to fetch ${url}`);
+}
+
+async function fetchProfileMetadataHttp({ username, cookieMap }) {
+  const profileUrl = `https://www.tiktok.com/@${username}`;
+  let attempt = 0;
+  let lastError;
+
+  while (attempt < 2) {
+    attempt += 1;
+    const cookieHeader = serializeCookieMap(cookieMap);
+    const headers = buildHtmlRequestHeaders({ cookieHeader, referer: 'https://www.tiktok.com/' });
+    const response = await fetchWithRetry(profileUrl, {
+      headers,
+      redirect: 'follow',
+      timeoutMs: HTTP_FETCH_TIMEOUT_MS
+    });
+
+    const setCookieValues =
+      typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
+    applySetCookieHeaders(cookieMap, setCookieValues);
+
+    const status = response.status;
+    const html = await response.text();
+
+    if (status === 404) {
+      const error = new Error(`TikTok profile "${username}" not found or has no public videos`);
+      error.code = 'PROFILE_NOT_FOUND';
+      throw error;
+    }
+
+    if (!response.ok) {
+      const error = new Error(`Failed to load TikTok profile page (status ${status})`);
+      error.code = 'PROFILE_HTTP_ERROR';
+      throw error;
+    }
+
+    try {
+      const universalData = extractUniversalDataFromHtml(html);
+      const userInfo = extractUserInfoFromUniversalData(universalData, username);
+      const scopeStatus = universalData?.__DEFAULT_SCOPE__?.['webapp.user-detail']?.statusCode;
+      if (typeof scopeStatus === 'number' && scopeStatus !== 0) {
+        const error = new Error(`TikTok profile "${username}" not found or is unavailable (status ${scopeStatus})`);
+        error.code = 'PROFILE_NOT_FOUND';
+        throw error;
+      }
+      return { userInfo, html };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt >= 2) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to load TikTok profile "${username}"`);
+}
+
+async function fetchItemListBatchHttp({ userInfo, cookieMap, cursor, count, username }) {
+  const url = new URL('https://www.tiktok.com/api/post/item_list/');
+  url.searchParams.set('aid', '1988');
+  url.searchParams.set('count', String(count));
+  url.searchParams.set('cursor', cursor);
+  url.searchParams.set('secUid', userInfo.user.secUid);
+  url.searchParams.set('userId', userInfo.user.id);
+  url.searchParams.set('uniqueId', userInfo.user.uniqueId || username || '');
+  url.searchParams.set('cookie_enabled', 'true');
+  url.searchParams.set('device_platform', 'web_pc');
+  url.searchParams.set('browser_language', 'en-US');
+  url.searchParams.set('browser_platform', 'Win32');
+  url.searchParams.set('browser_name', 'Chrome');
+  url.searchParams.set('browser_version', '122.0.0.0');
+  url.searchParams.set('app_name', 'tiktok_web');
+  url.searchParams.set('app_language', 'en');
+  url.searchParams.set('region', 'US');
+  url.searchParams.set('priority_region', 'US');
+  url.searchParams.set('timezone_name', 'UTC');
+  url.searchParams.set('sourceType', '8');
+
+  const cookieHeader = serializeCookieMap(cookieMap);
+  const headers = buildApiRequestHeaders({
+    cookieHeader,
+    referer: `https://www.tiktok.com/@${userInfo.user.uniqueId || username || ''}`
+  });
+
+  const response = await fetchWithRetry(url.toString(), {
+    headers,
+    redirect: 'follow',
+    timeoutMs: HTTP_FETCH_TIMEOUT_MS
+  });
+
+  const setCookieValues = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
+  applySetCookieHeaders(cookieMap, setCookieValues);
+
+  const status = response.status;
+
+  const responseText = await response.text();
+
+  if (status === 404) {
+    const error = new Error('TikTok returned 404 while fetching item list');
+    error.code = 'ITEM_LIST_NOT_FOUND';
+    throw error;
+  }
+
+  if (!response.ok) {
+    const snippet = responseText.slice(0, 200);
+    const error = new Error(
+      `Failed to fetch TikTok item list (status ${status})${snippet ? `: ${snippet}` : ''}`
+    );
+    error.code = 'ITEM_LIST_HTTP_ERROR';
+    throw error;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(responseText);
+  } catch (error) {
+    const parseError = new Error('Unable to parse TikTok item list response JSON');
+    parseError.code = 'ITEM_LIST_PARSE_ERROR';
+    parseError.cause = error;
+    throw parseError;
+  }
+
+  if (payload && typeof payload.statusCode === 'number' && payload.statusCode !== 0) {
+    const error = new Error(`TikTok item list responded with status code ${payload.statusCode}`);
+    error.code = `ITEM_LIST_STATUS_${payload.statusCode}`;
+    throw error;
+  }
+
+  const items = Array.isArray(payload?.itemList) ? payload.itemList : [];
+
+  return {
+    items,
+    cursor: payload?.cursor ?? '',
+    hasMore: Boolean(payload?.hasMore),
+    extra: payload?.extra ?? null
+  };
+}
+
+function resolveTotalVideoCount(stats) {
+  if (!stats) {
+    return null;
+  }
+  const candidates = [
+    stats.videoCount,
+    stats.video_count,
+    stats.video_count_estimate,
+    stats?.stats?.videoCount,
+    stats?.statsV2?.videoCount
+  ];
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) {
+      continue;
+    }
+    const parsed = Number.parseInt(candidate, 10);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+async function seedInitialCookies(cookieMap) {
+  if (!(cookieMap instanceof Map)) {
+    return;
+  }
+  if (cookieMap.has('ttwid') && cookieMap.has('msToken')) {
+    return;
+  }
+
+  const cookieHeader = serializeCookieMap(cookieMap);
+  const headers = buildHtmlRequestHeaders({ cookieHeader, referer: 'https://www.tiktok.com/' });
+
+  try {
+    const response = await fetchWithRetry('https://www.tiktok.com/', {
+      headers,
+      redirect: 'follow',
+      timeoutMs: HTTP_FETCH_TIMEOUT_MS
+    });
+    const setCookieValues =
+      typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
+    applySetCookieHeaders(cookieMap, setCookieValues);
+  } catch (error) {
+    console.warn('Unable to pre-seed TikTok cookies:', error);
+  }
+}
+
+async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, startEpoch, endEpoch }) {
+  const cookieMap = createCookieMap(cookies);
+  await seedInitialCookies(cookieMap);
+  const profileResult = await fetchProfileMetadataHttp({ username, cookieMap });
+  const userInfo = profileResult.userInfo;
+  const totalVideoCount = resolveTotalVideoCount(userInfo.stats ?? userInfo.statsV2);
+
+  const aggregatedRawVideos = [];
+  let cursor = '0';
+  let hasMore = true;
+  let iterations = 0;
+
+  const targetItems = Math.max(pageNum * perPageNum, perPageNum);
+  const desiredTotal =
+    typeof totalVideoCount === 'number'
+      ? totalVideoCount
+      : targetItems + HTTP_ITEM_LIST_PAGE_SIZE * HTTP_ITEM_LIST_BUFFER_PAGES;
+
+  while (hasMore && iterations < HTTP_ITEM_LIST_MAX_PAGES) {
+    const batch = await fetchItemListBatchHttp({
+      userInfo,
+      cookieMap,
+      cursor,
+      count: HTTP_ITEM_LIST_PAGE_SIZE,
+      username
+    });
+
+    if (batch.items.length) {
+      aggregatedRawVideos.push(...batch.items);
+    }
+
+    hasMore = batch.hasMore;
+    cursor = batch.cursor || '';
+    iterations += 1;
+
+    if (!hasMore || !cursor) {
+      break;
+    }
+
+    if (!startEpoch && !endEpoch) {
+      if (aggregatedRawVideos.length >= desiredTotal) {
+        break;
+      }
+      if (typeof totalVideoCount === 'number' && aggregatedRawVideos.length >= totalVideoCount) {
+        break;
+      }
+      continue;
+    }
+
+    const normalizedSoFar = normalizeVideos(aggregatedRawVideos, username);
+    normalizedSoFar.sort((a, b) => {
+      const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
+      const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
+      return bTime - aTime;
+    });
+
+    const filteredSoFar = filterVideosByEpoch(normalizedSoFar, startEpoch, endEpoch);
+    const enoughFiltered = filteredSoFar.length >= targetItems + perPageNum;
+    if (enoughFiltered) {
+      break;
+    }
+
+    if (typeof totalVideoCount === 'number' && aggregatedRawVideos.length >= totalVideoCount) {
+      break;
+    }
+
+    if (aggregatedRawVideos.length >= desiredTotal) {
+      break;
+    }
+  }
+
+  const normalizedVideos = normalizeVideos(aggregatedRawVideos, username);
+  normalizedVideos.sort((a, b) => {
+    const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
+    const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
+    return bTime - aTime;
+  });
+
+  return {
+    videos: normalizedVideos,
+    profileInfo: userInfo,
+    diagnostics: {
+      source: 'http',
+      iterations,
+      fetched_batches: iterations,
+      fetched_items: normalizedVideos.length,
+      has_more: hasMore,
+      last_cursor: cursor || null,
+      total_video_count: totalVideoCount
+    }
+  };
 }
 
 function ensureLibraryPaths(executablePath) {
@@ -761,7 +1217,15 @@ async function detectProfileUnavailable(page) {
   }
 }
 
-async function collectVideoData(page, username) {
+async function collectVideoData(page, username, options = {}) {
+  const {
+    targetItems = 50,
+    pageSize = HTTP_ITEM_LIST_PAGE_SIZE,
+    maxPages = HTTP_ITEM_LIST_MAX_PAGES,
+    startEpoch = null,
+    endEpoch = null
+  } = options;
+
   const apiResponses = [];
 
   page.on('response', async (response) => {
@@ -812,7 +1276,145 @@ async function collectVideoData(page, username) {
     videos = await extractVideosFromDom(page);
   }
 
-  return videos;
+  let profileInfo = null;
+
+  try {
+    const expanded = await page.evaluate(
+      async ({ desiredItems, fetchCount, maxFetches, minStartEpoch, maxEndEpoch }) => {
+        const scope = window.__UNIVERSAL_DATA_FOR_REHYDRATION__?.__DEFAULT_SCOPE__;
+        const userInfo = scope?.['webapp.user-detail']?.userInfo ?? null;
+
+        if (!userInfo?.user?.secUid) {
+          return { items: [], userInfo };
+        }
+
+        const results = [];
+        const seen = new Set();
+        let cursor = '0';
+        let hasMore = true;
+        let iterations = 0;
+
+        const normalizedFetchCount = Math.max(1, Math.min(fetchCount, 100));
+        const maxIterations = Math.max(1, maxFetches);
+        const bufferTarget = normalizedFetchCount * 2;
+
+        const passesEpoch = (item) => {
+          const epochCandidates = [
+            item?.createTime,
+            item?.create_time,
+            item?.timestamp,
+            item?.publishedTime,
+            item?.itemInfos?.createTime,
+            item?.stats?.createTime
+          ];
+
+          const epoch = epochCandidates
+            .map((value) => {
+              const parsed = Number.parseInt(value, 10);
+              return Number.isNaN(parsed) ? null : parsed;
+            })
+            .find((value) => typeof value === 'number' && value > 0);
+
+          if (typeof epoch !== 'number') {
+            return true;
+          }
+
+          if (typeof minStartEpoch === 'number' && epoch < minStartEpoch) {
+            return false;
+          }
+
+          if (typeof maxEndEpoch === 'number' && epoch > maxEndEpoch) {
+            return false;
+          }
+
+          return true;
+        };
+
+        while (hasMore && iterations < maxIterations) {
+          const params = new URLSearchParams({
+            aid: '1988',
+            count: String(normalizedFetchCount),
+            cursor,
+            secUid: userInfo.user.secUid,
+            userId: userInfo.user.id,
+            uniqueId: userInfo.user.uniqueId || ''
+          });
+          params.set('cookie_enabled', 'true');
+          params.set('device_platform', 'web_pc');
+
+          try {
+            const response = await fetch(`https://www.tiktok.com/api/post/item_list/?${params.toString()}`, {
+              headers: { accept: 'application/json, text/plain, */*' }
+            });
+            if (!response.ok) {
+              break;
+            }
+            const payload = await response.json();
+            const items = Array.isArray(payload?.itemList) ? payload.itemList : [];
+
+            for (const item of items) {
+              const identifier =
+                item?.id ||
+                item?.aweme_id ||
+                (item?.video && item.video.id) ||
+                item?.awemeId ||
+                item?.itemId ||
+                null;
+              if (!identifier || seen.has(identifier)) {
+                continue;
+              }
+              seen.add(identifier);
+              results.push(item);
+            }
+
+            hasMore = Boolean(payload?.hasMore);
+            cursor = payload?.cursor || '';
+            iterations += 1;
+
+            if (!hasMore || !cursor) {
+              break;
+            }
+
+            const baselineTarget = desiredItems + bufferTarget;
+            if (typeof minStartEpoch !== 'number' && typeof maxEndEpoch !== 'number') {
+              if (results.length >= baselineTarget) {
+                break;
+              }
+            } else {
+              const filteredCount = results.filter(passesEpoch).length;
+              if (filteredCount >= baselineTarget) {
+                break;
+              }
+            }
+          } catch {
+            break;
+          }
+        }
+
+        return { items: results, userInfo };
+      },
+      {
+        desiredItems: Math.max(1, targetItems),
+        fetchCount: Math.max(1, Math.min(pageSize, 100)),
+        maxFetches: Math.max(1, maxPages),
+        minStartEpoch: typeof startEpoch === 'number' ? startEpoch : null,
+        maxEndEpoch: typeof endEpoch === 'number' ? endEpoch : null
+      }
+    );
+
+    if (expanded) {
+      if (Array.isArray(expanded.items) && expanded.items.length) {
+        videos.push(...expanded.items);
+      }
+      if (expanded.userInfo?.user?.secUid) {
+        profileInfo = expanded.userInfo;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to expand TikTok videos via in-page fetch:', error);
+  }
+
+  return { videos, profileInfo };
 }
 
 export default async function handler(req, res) {
@@ -912,23 +1514,78 @@ export default async function handler(req, res) {
   const missingCookies = cookies.length === 0;
 
   try {
-    browser = await createBrowser();
-    page = await browser.newPage();
-    page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
+    let fetchContext = null;
+    let httpError = null;
 
-    await preparePage(page, cookies);
+    try {
+      fetchContext = await fetchVideosViaHttp({
+        username,
+        cookies,
+        pageNum,
+        perPageNum,
+        startEpoch,
+        endEpoch
+      });
+    } catch (error) {
+      httpError = error instanceof Error ? error : new Error(String(error));
+      console.warn('Primary HTTP fetch failed, attempting browser fallback:', httpError);
+    }
 
-    const rawVideos = await collectVideoData(page, username);
-    const normalizedVideos = normalizeVideos(rawVideos, username);
+    if (httpError?.code === 'PROFILE_NOT_FOUND') {
+      return res.status(404).json({
+        error: 'TikTok profile not found or has no public videos',
+        status: 'error',
+        code: 404
+      });
+    }
+
+    if (!fetchContext) {
+      browser = await createBrowser();
+      page = await browser.newPage();
+      page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
+
+      await preparePage(page, cookies);
+
+      const targetCount = Math.max(pageNum * perPageNum, perPageNum);
+      const { videos: rawVideos, profileInfo } = await collectVideoData(page, username, {
+        targetItems: targetCount,
+        pageSize: HTTP_ITEM_LIST_PAGE_SIZE,
+        maxPages: HTTP_ITEM_LIST_MAX_PAGES,
+        startEpoch,
+        endEpoch
+      });
+
+      const normalizedVideos = normalizeVideos(rawVideos, username);
+      normalizedVideos.sort((a, b) => {
+        const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
+        const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
+        return bTime - aTime;
+      });
+
+      fetchContext = {
+        videos: normalizedVideos,
+        profileInfo: profileInfo ?? null,
+        diagnostics: {
+          source: 'browser',
+          http_error_code: httpError?.code ?? null,
+          http_error_message: httpError ? httpError.message : null
+        }
+      };
+    } else if (!fetchContext.diagnostics?.source) {
+      fetchContext.diagnostics = { ...(fetchContext.diagnostics ?? {}), source: 'http' };
+    }
+
+    if (!fetchContext || !Array.isArray(fetchContext.videos)) {
+      throw new Error('Unable to retrieve TikTok videos with available methods');
+    }
+
+    const normalizedVideos = fetchContext.videos;
+    const profileInfo = fetchContext.profileInfo ?? null;
+    const diagnostics = fetchContext.diagnostics ?? {};
+
     const filteredVideos = filterVideosByEpoch(normalizedVideos, startEpoch, endEpoch);
 
-    filteredVideos.sort((a, b) => {
-      const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
-      const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
-      return bTime - aTime;
-    });
-
-    if (!filteredVideos.length) {
+    if (!filteredVideos.length && diagnostics.source === 'browser' && page) {
       const unavailable = await detectProfileUnavailable(page);
       if (unavailable) {
         return res.status(404).json({
@@ -944,6 +1601,10 @@ export default async function handler(req, res) {
     const startIndex = (pageNum - 1) * perPageNum;
     const paginatedVideos = filteredVideos.slice(startIndex, startIndex + perPageNum);
 
+    const profileTotalPosts = resolveTotalVideoCount(
+      profileInfo?.stats ?? profileInfo?.statsV2 ?? profileInfo
+    );
+
     const responsePayload = {
       meta: {
         username,
@@ -951,16 +1612,24 @@ export default async function handler(req, res) {
         total_pages: totalPages,
         posts_per_page: perPageNum,
         total_posts: totalPosts,
+        profile_total_posts: typeof profileTotalPosts === 'number' ? profileTotalPosts : totalPosts,
+        fetched_posts: normalizedVideos.length,
         start_epoch: startEpoch,
         end_epoch: endEpoch,
         first_video_epoch: filteredVideos[0]?.epoch_time_posted ?? null,
         last_video_epoch: filteredVideos[filteredVideos.length - 1]?.epoch_time_posted ?? null,
         request_time: Math.floor(Date.now() / 1000),
-        cache_status: res.getHeader('X-Cache')
+        cache_status: res.getHeader('X-Cache'),
+        fetch_method: diagnostics.source,
+        fetch_iterations: diagnostics.iterations ?? diagnostics.fetched_batches ?? null
       },
       data: paginatedVideos,
       status: 'success'
     };
+
+    if (diagnostics.http_error_message || diagnostics.http_error_code) {
+      responsePayload.meta.http_fallback_reason = diagnostics.http_error_message ?? diagnostics.http_error_code;
+    }
 
     storeCachedResponse(cacheKey, responsePayload);
 

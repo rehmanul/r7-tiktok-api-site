@@ -2,6 +2,8 @@
 cookies.json
 venv_test/
 .env
+.env.production
+.env.production.bak
 __pycache__/
 output/*.json
 .vercel

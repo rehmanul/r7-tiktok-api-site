@@ -5,6 +5,7 @@ A production-ready Node.js API for retrieving TikTok posts by username. The serv
 ## Highlights
 
 - Headless Chromium scraping with robust DOM/API parsing (no mocked data or placeholders)
+- Fast-path HTTP scraping that avoids launching Chromium when TikTok responds cleanly
 - Configurable rate limiting (per-minute and per-hour windows) surfaced via response headers
 - In-memory response cache with TTL and bounded size
 - Time range filtering (`start_epoch` / `end_epoch`) and pagination (`page`, `per-page`)
@@ -43,6 +44,11 @@ Visit `http://localhost:3000/` for the bundled dashboard or query the API direct
 | `CACHE_MAX_ENTRIES` | Max cached responses stored in memory | `100` |
 | `NAVIGATION_TIMEOUT_MS` | Puppeteer navigation timeout | `30000` |
 | `CONTENT_WAIT_MS` | Wait after load before scraping | `5000` |
+| `HTTP_FETCH_TIMEOUT_MS` | Timeout (ms) for direct HTTP requests to TikTok | `12000` |
+| `HTTP_MAX_RETRIES` | Retries for direct HTTP requests before failing over | `3` |
+| `TIKTOK_ITEM_LIST_PAGE_SIZE` | Items requested per TikTok API page (max `35`) | `30` |
+| `TIKTOK_ITEM_LIST_MAX_PAGES` | Maximum HTTP pages fetched before stopping | `40` |
+| `TIKTOK_ITEM_LIST_BUFFER_PAGES` | Extra HTTP pages fetched beyond the requested window | `2` |
 | `PORT` | HTTP port used in local/Docker setups | `3000` |
 
 Cookies can be supplied per request with the `X-TikTok-Cookie` header (base64 encoded string or JSON cookie array). Environment values act as defaults when the header is omitted.
@@ -92,15 +98,19 @@ curl "http://localhost:3000/api/tiktok?username=tiktok&per-page=5" \
   "meta": {
     "username": "tiktok",
     "page": 1,
-    "total_pages": 3,
+    "total_pages": 24,
     "posts_per_page": 5,
-    "total_posts": 15,
+    "total_posts": 120,
+    "profile_total_posts": 120,
+    "fetched_posts": 120,
     "start_epoch": null,
     "end_epoch": null,
     "first_video_epoch": 1729446293,
     "last_video_epoch": 1727010241,
     "request_time": 1729621200,
-    "cache_status": "MISS"
+    "cache_status": "MISS",
+    "fetch_method": "http",
+    "fetch_iterations": 4
   },
   "data": [
     {
@@ -118,6 +128,13 @@ curl "http://localhost:3000/api/tiktok?username=tiktok&per-page=5" \
 }
 ```
 Fields without TikTok data are returned as `null` rather than synthetic defaults.
+
+The `meta` object now surfaces additional telemetry:
+- `profile_total_posts`: TikTok’s reported post count (from the profile header).
+- `fetched_posts`: Number of posts gathered during the request (after de-duplication).
+- `fetch_method`: `http` when the lightweight fetch path succeeds, or `browser` when Chromium was required.
+- `fetch_iterations`: How many paginated HTTP calls were needed (useful when tuning limits).
+- `http_fallback_reason`: Present only when the handler had to fall back to Chromium after a failed HTTP attempt.
 
 ## Rate Limiting & Caching
 
