@@ -1,5 +1,5 @@
 {
-    "buildCommand": "yum install -y amazon-linux-extras && amazon-linux-extras install epel -y && yum install -y chromium chromium-headless chromium-libs nss cups-libs atk at-spi2-atk libXcomposite libXcursor libXdamage libXext libXi libXrandr libXScrnSaver libXtst pango alsa-lib && echo 'Build complete'",
+    "buildCommand": "chmod +x build.sh && ./build.sh",
     "outputDirectory": "public",
     "functions": {
         "api/tiktok.js": {
