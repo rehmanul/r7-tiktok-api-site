@@ -989,12 +989,14 @@ export default async function handler(req, res) {
     } else if (/executable path not available/i.test(error.message)) {
       statusCode = 503;
       message = 'Chromium executable not available in the current environment.';
-      hints.push('Verify that @sparticuz/chromium-min is installed and Vercel functions are allowed to download Chromium.');
+      hints.push(
+        'Verify that @sparticuz/chromium-min is installed and CHROMIUM_PACK_URL (or CHROMIUM_BINARIES_PATH) points to the Brotli bundle.'
+      );
     } else if (loweredMessage.includes('failed to launch the browser process')) {
       statusCode = 503;
       message = 'Failed to launch Chromium in the Vercel environment.';
       hints.push(
-        'Clear the function cache and redeploy so @sparticuz/chromium-min can download a fresh binary.'
+        'Ensure the Brotli pack is reachable (CHROMIUM_PACK_URL) and redeploy without cache so Chromium can unpack again.'
       );
       hints.push('Confirm PUPPETEER_CACHE_DIR points to a writable location (default /tmp/chromium-cache).');
     } else if (
