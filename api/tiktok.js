@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 
@@ -372,6 +373,29 @@ function storeCachedResponse(cacheKey, payload) {
   });
 }
 
+function ensureLibraryPaths(executablePath) {
+  try {
+    const chromiumDir = path.dirname(executablePath);
+    const possibleLibDirs = [
+      path.join(chromiumDir, 'lib'),
+      path.join(chromiumDir, 'swiftshader')
+    ];
+
+    const clean = (value) => value && value.trim().length > 0;
+
+    const prevLd = process.env.LD_LIBRARY_PATH || '';
+    const prevFont = process.env.FONTCONFIG_PATH || '';
+
+    const newLd = [...possibleLibDirs, prevLd].filter(clean).join(':');
+    const fontConfig = path.join(chromiumDir, 'fonts');
+
+    process.env.LD_LIBRARY_PATH = newLd;
+    process.env.FONTCONFIG_PATH = clean(prevFont) ? prevFont : fontConfig;
+  } catch (err) {
+    console.warn('Unable to configure Chromium library paths:', err);
+  }
+}
+
 async function resolveExecutablePath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
@@ -392,6 +416,7 @@ async function createBrowser() {
   ensureChromiumCacheDir();
 
   const executablePath = await resolveExecutablePath();
+  ensureLibraryPaths(executablePath);
 
   return puppeteer.launch({
     args: [

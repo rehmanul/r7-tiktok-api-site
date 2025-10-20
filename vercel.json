@@ -2,16 +2,10 @@
     "version": 2,
     "buildCommand": "npm ci",
     "outputDirectory": "public",
-    "functions": {
-        "api/tiktok.js": {
-            "memory": 2048,
-            "maxDuration": 60
-        }
-    },
     "build": {
         "env": {
             "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-            "NODE_VERSION": "18.x"
+            "NODE_VERSION": "22.x"
         }
     }
 }
