@@ -376,7 +376,7 @@ function extractTimestampFromVideo(video) {
 {
   "functions": {
     "api/tiktok.js": {
-      "memory": 3008,
+      "memory": 2048,
       "maxDuration": 60,
       "runtime": "nodejs22.x"
     }
@@ -585,7 +585,7 @@ curl "https://your-api.vercel.app/api/tiktok?username=techreviews&page=1&per-pag
 {
   "functions": {
     "api/tiktok.js": {
-      "memory": 3008
+      "memory": 2048
     }
   }
 }

@@ -135,6 +135,7 @@ Fields without TikTok data are returned as `null` rather than synthetic defaults
 
 - Runtime: `nodejs22.x` (configured in `vercel.json`)
 - Build command: `npm ci`
+- Memory: `2048` MB (Hobby plan maximum; upgrade to Vercel Pro or Teams to raise it)
 - Ensure `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true` is set (already in `vercel.json`)
 - Configure environment variables in the Vercel dashboard identical to `.env.production`
 - Deploy via Git integration or `vercel --prod`

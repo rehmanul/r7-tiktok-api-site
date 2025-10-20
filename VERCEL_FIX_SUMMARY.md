@@ -40,14 +40,14 @@
   "installCommand": "npm ci",
   "functions": {
     "api/tiktok.js": {
-      "memory": 3008,
+      "memory": 2048,
       "maxDuration": 60
     }
   }
 }
 ```
 - Added explicit build and output directory configuration
-- Increased memory to 3008 MB (max for serverless)
+- Increased memory to 2048 MB (Hobby plan ceiling)
 - Set timeout to 60 seconds
 
 ### `api/tiktok.js`
@@ -111,7 +111,7 @@ git push origin main
 ## Resource Limits (Vercel)
 
 Your API configuration:
-- **Memory**: 3008 MB (max available)
+- **Memory**: 2048 MB (Hobby plan ceiling)
 - **Timeout**: 60 seconds
 - **Concurrent executions**: As many as needed (serverless scales automatically)
 
