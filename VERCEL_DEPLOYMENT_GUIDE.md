@@ -16,7 +16,7 @@ Vercel has **built-in GitHub integration** that automatically deploys your proje
    - Build Command: `npm run build` (runs a lightweight sanity check)
    - Install Command: `npm ci`
    - Output Directory: leave empty (serverless functions only)
-   - Node.js Version: `22.x` (Project Settings → General → Node.js Version)
+   - Node.js Version: `18.x` (Hobby plan default; Pro/Team plans can upgrade to 20/22)
    - Memory: leave at the Hobby default (2048 MB). Higher values require a Vercel Pro/Team plan.
 4. **Deploy**: Click "Deploy"
 

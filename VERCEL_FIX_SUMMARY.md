@@ -85,7 +85,7 @@ const browser = await puppeteer.launch({
 ### ✅ GitHub Actions (CI/CD):
 ```
 ✓ CI / lint_and_tests - PASSING
-✓ Run tests (Node 22.x) - PASSING
+✓ Run tests (Node 18.x) - PASSING
 ✓ Run tests (Node 20.x) - PASSING
 ```
 

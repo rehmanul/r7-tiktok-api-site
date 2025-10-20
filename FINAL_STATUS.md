@@ -40,7 +40,7 @@ node --check api/tiktok.js  ✓ No syntax errors
    - ✓ Validates syntax
 
 2. **Run tests** (`.github/workflows/tests.yml`)
-   - ✓ Tests on Node 22.x
+   - ✓ Tests on Node 18.x
    - ✓ Tests on Node 20.x
    - ✓ Multi-version compatibility
 
