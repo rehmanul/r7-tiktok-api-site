@@ -2,7 +2,6 @@
     "version": 2,
     "buildCommand": "npm ci",
     "outputDirectory": "public",
-    "framework": "node",
     "functions": {
         "api/tiktok.js": {
             "memory": 2048,
