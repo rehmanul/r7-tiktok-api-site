@@ -25,6 +25,11 @@ const responseCache = new Map();
 
 let cachedExecutablePath;
 
+const DEFAULT_CHROMIUM_PACK_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.x64.tar';
+const CHROMIUM_SOURCE =
+  process.env.CHROMIUM_BINARIES_PATH || process.env.CHROMIUM_PACK_URL || DEFAULT_CHROMIUM_PACK_URL;
+
 function ensureChromiumCacheDir() {
   const defaultCache = '/tmp/chromium-cache';
   const targetDir = process.env.PUPPETEER_CACHE_DIR || defaultCache;
@@ -402,7 +407,7 @@ async function resolveExecutablePath() {
   }
 
   if (!cachedExecutablePath) {
-    cachedExecutablePath = await chromium.executablePath();
+    cachedExecutablePath = await chromium.executablePath(CHROMIUM_SOURCE);
   }
 
   if (!cachedExecutablePath) {
