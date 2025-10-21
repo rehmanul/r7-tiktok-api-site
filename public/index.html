@@ -4,9 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎥 TikTok API - Advanced Video Scraper</title>
-    <link rel="icon" type="image/png"
-        href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAF0WlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4gPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNy4yLWMwMDAgNzkuMWI2NWE3OWI0LCAyMDIyLzA2LzEzLTIyOjAxOjAxICAgICAgICAiPiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPiA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgMjQuMCAoTWFjaW50b3NoKSIgeG1wOkNyZWF0ZURhdGU9IjIwMjMtMTAtMjBUMTQ6MzE6NDEtMDc6MDAiIHhtcDpNZXRhZGF0YURhdGU9IjIwMjMtMTAtMjBUMTQ6MzE6NDEtMDc6MDAiIHhtcDpNb2RpZnlEYXRlPSIyMDIzLTEwLTIwVDE0OjMxOjQxLTA3OjAwIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOmE1Y2YyZjQxLTU2ZDUtNDFiNS05NjdiLTk2NmYxNzg5OTNlZiIgeG1wTU06RG9jdW1lbnRJRD0iYWRvYmU6ZG9jaWQ6cGhvdG9zaG9wOjY0ZDFmYTZiLTVhZjYtYjU0MC1hZjVjLTU3NWYxMWJkOTM4OCIgeG1wTU06T3JpZ2luYWxEb2N1bWVudElEPSJ4bXAuZGlkOmNhYzIzZjQwLWQ3ZTctNDFiNS1iMjc3LTBkNzY2NGM4ZjlhZiIgZGM6Zm9ybWF0PSJpbWFnZS9wbmciIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiPiA8eG1wTU06SGlzdG9yeT4gPHJkZjpTZXE+IDxyZGY6bGkgc3RFdnQ6YWN0aW9uPSJjcmVhdGVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOmNhYzIzZjQwLWQ3ZTctNDFiNS1iMjc3LTBkNzY2NGM4ZjlhZiIgc3RFdnQ6d2hlbj0iMjAyMy0xMC0yMFQxNDozMTo0MS0wNzowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDI0LjAgKE1hY2ludG9zaCkiLz4gPHJkZjpsaSBzdEV2dDphY3Rpb249InNhdmVkIiBzdEV2dDppbnN0YW5jZUlEPSJ4bXAuaWlkOmE1Y2YyZjQxLTU2ZDUtNDFiNS05NjdiLTk2NmYxNzg5OTNlZiIgc3RFdnQ6d2hlbj0iMjAyMy0xMC0yMFQxNDozMTo0MS0wNzowMCIgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWRvYmUgUGhvdG9zaG9wIDI0LjAgKE1hY2ludG9zaCkiIHN0RXZ0OmNoYW5nZWQ9Ii8iLz4gPC9yZGY6U2VxPiA8L3htcE1NOkhpc3Rvcnk+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+YgT/0AAAAUlJREFUOI2Vkj9LA0EQxX+7l0RQsIqFhdhZCKKFhYVYCMFK8FOktvoNYmOjjYV2NhYiCIKFhUUKG8HaQu0SxEJsJIdwl7vZ3FniH0TfwbLMzr6Zt7MLVhRFEWOMiAhpmiIiGGMAEBGstRhjyLIM51z5fwIRwVpbJhQRnHPOGGMwxmjXdfHeU/ZlWSbGGMF7D0BRFD+cc7c40BKRoYhcicjQe58DOOdcYa3NGWP0KwF47yNjTIYDPPCWZdmdiAy89/MQ5XkOQJIkq6IoLkTEPQHHURSd53n+HmL1jDGr+XK5fO52u/dRFJ0Bm/wHvu9P4ji+MMbM4zi+2SASkV6r1XoSkTaggA+gOxqNZr+R4zgGON1EoIBn4AnYBQx/YIDRfr//GobhL4Gu1+tJkiRzpdSBUuok8JeAVcA78ArMAC0iO9sS/AQSgUXzL6cD6AAAAABJRU5ErkJggg==">
+    <title>TikTok API Video Scraper</title>
     <style>
         :root {
             --primary-bg: #f8f9fa;
@@ -130,7 +128,7 @@
             gap: 8px;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             transform: translateY(-2px);
             opacity: 0.9;
         }
@@ -274,6 +272,99 @@
             border-radius: 8px;
         }
 
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 10px 15px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            min-width: 40px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination button.active {
+            background: var(--success-color);
+        }
+
+        .pagination .page-info {
+            padding: 10px 20px;
+            background: var(--secondary-bg);
+            border-radius: 8px;
+            font-weight: 600;
+            border: 1px solid var(--border-color);
+        }
+
+        .export-options {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .export-btn {
+            padding: 10px 15px;
+            background: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .view-btn {
+            padding: 10px 15px;
+            background: var(--secondary-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .view-btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .json-view {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
         .response-time {
             position: fixed;
             top: 20px;
@@ -305,6 +396,16 @@
                 text-align: center;
                 gap: 20px;
             }
+
+            .pagination {
+                gap: 5px;
+            }
+
+            .pagination button {
+                padding: 8px 12px;
+                min-width: 35px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -334,7 +435,7 @@
                         <label for="perPage">Videos Per Page</label>
                         <select id="perPage">
                             <option value="10">10 videos</option>
-                            <option value="20">20 videos</option>
+                            <option value="20" selected>20 videos</option>
                             <option value="50">50 videos</option>
                             <option value="100">100 videos</option>
                         </select>
@@ -357,18 +458,50 @@
                     </div>
                 </div>
 
-                <button type="submit" id="submitBtn">
-                    <span class="btn-icon">🔍</span>
-                    <span class="btn-text">Fetch Videos</span>
-                </button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="submit" id="submitBtn">
+                        <span class="btn-icon">🔍</span>
+                        <span class="btn-text">Fetch Videos</span>
+                    </button>
+                </div>
             </form>
         </div>
 
         <div id="metaInfo"></div>
+        
+        <!-- View Toggle -->
+        <div class="view-toggle" id="viewToggle" style="display: none;">
+            <button class="view-btn active" id="cardViewBtn">📱 Card View</button>
+            <button class="view-btn" id="jsonViewBtn">📄 JSON View</button>
+        </div>
+
+        <!-- Export Options -->
+        <div class="export-options" id="exportOptions" style="display: none;">
+            <button class="export-btn" id="exportJsonBtn">📄 Export JSON</button>
+            <button class="export-btn" id="exportCsvBtn">📊 Export CSV</button>
+        </div>
+
+        <!-- Pagination Controls (Top) -->
+        <div id="pagination"></div>
+
+        <!-- Results Display -->
         <div id="results"></div>
+
+        <!-- Pagination Controls (Bottom) -->
+        <div id="paginationBottom"></div>
     </div>
 
     <script>
+        // Global state
+        let currentData = null;
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentUsername = '';
+        let currentPerPage = 20;
+        let currentFilters = {};
+        let currentView = 'card'; // 'card' or 'json'
+        let allVideosData = []; // Store all videos for export
+
         // Cache management
         const cache = new Map();
         const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -391,6 +524,23 @@
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
 
+        // Loading spinner
+        function showLoading(show) {
+            let loadingDiv = document.querySelector('.loading');
+            if (show) {
+                if (!loadingDiv) {
+                    loadingDiv = document.createElement('div');
+                    loadingDiv.className = 'loading';
+                    loadingDiv.innerHTML = '<div class="loading-spinner"></div>';
+                    document.body.appendChild(loadingDiv);
+                }
+            } else {
+                if (loadingDiv) {
+                    loadingDiv.remove();
+                }
+            }
+        }
+
         // Toast notifications
         function showToast(message, type = 'success') {
             const toast = document.createElement('div');
@@ -400,20 +550,7 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Loading indicator
-        function showLoading(show = true) {
-            const existing = document.querySelector('.loading');
-            if (show && !existing) {
-                const loading = document.createElement('div');
-                loading.className = 'loading';
-                loading.innerHTML = '<div class="loading-spinner"></div>';
-                document.body.appendChild(loading);
-            } else if (!show && existing) {
-                existing.remove();
-            }
-        }
-
-        // Response time tracking
+        // Response time display
         function showResponseTime(startTime) {
             const endTime = performance.now();
             const duration = Math.round(endTime - startTime);
@@ -430,8 +567,15 @@
         const metaInfoDiv = document.getElementById('metaInfo');
         const submitBtn = document.getElementById('submitBtn');
 
+        // Form submission handler
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            currentPage = 1; // Reset to first page
+            await fetchVideos();
+        });
+
+        // Fetch videos from API
+        async function fetchVideos(page = 1) {
             const startTime = performance.now();
 
             const formData = {
@@ -439,8 +583,15 @@
                 perPage: document.getElementById('perPage').value,
                 startDate: document.getElementById('startDate').value,
                 endDate: document.getElementById('endDate').value,
-                cookie: document.getElementById('cookie').value.trim()
+                cookie: document.getElementById('cookie').value.trim(),
+                page: page
             };
+
+            // Update state
+            currentUsername = formData.username;
+            currentPerPage = formData.perPage;
+            currentPage = page;
+            currentFilters = formData;
 
             // Check cache
             const cacheKey = JSON.stringify(formData);
@@ -459,7 +610,8 @@
                 // Convert dates to epochs if provided
                 const params = new URLSearchParams({
                     username: formData.username,
-                    'per-page': formData.perPage
+                    'per-page': formData.perPage,
+                    page: page
                 });
 
                 if (formData.startDate) {
@@ -505,7 +657,7 @@
             } catch (error) {
                 showToast(error.message, 'error');
                 resultsDiv.innerHTML = `
-                    <div class="error">
+                    <div style="text-align: center; padding: 40px;">
                         <h3>❌ Error</h3>
                         <p>${error.message}</p>
                     </div>
@@ -514,7 +666,7 @@
                 showLoading(false);
                 submitBtn.disabled = false;
             }
-        });
+        }
 
         function extractHeaderInfo(response) {
             const get = (name) => response.headers.get(name);
@@ -541,8 +693,16 @@
         }
 
         function displayResults(data, headerInfo = {}) {
+            currentData = data;
+            allVideosData = data.data || [];
+
+            // Show view toggle and export options
+            document.getElementById('viewToggle').style.display = 'flex';
+            document.getElementById('exportOptions').style.display = 'flex';
+
             // Display meta information
             if (data.meta) {
+                totalPages = data.meta.total_pages || 1;
                 const cacheStatus = headerInfo.cacheStatus || data.meta.cache_status || 'unknown';
                 const cacheExpires = headerInfo.cacheExpiresIn ? `${headerInfo.cacheExpiresIn}s` : '';
                 const minuteLimit = formatRateLimit(headerInfo.rateLimit?.minute);
@@ -553,65 +713,250 @@
                         <div class="meta-stat">
                             <h3>📊 @${data.meta.username}</h3>
                             <p>Total Posts: ${formatNumber(data.meta.total_posts)}</p>
-                            <p>Page ${formatNumber(data.meta.page)} of ${formatNumber(data.meta.total_pages)}</p>
-                            <p>${formatNumber(data.meta.posts_per_page)} posts per page</p>
+                            <p>Showing: ${formatNumber(data.data?.length || 0)} videos</p>
+                            <p>${formatNumber(data.meta.posts_per_page)} per page</p>
+                        </div>
+                        <div class="meta-stat">
+                            <h3>📄 Page Info</h3>
+                            <p style="font-size: 1.5em; font-weight: bold;">Page ${data.meta.page} of ${data.meta.total_pages}</p>
+                            <p>Current View: <strong>${currentView === 'card' ? 'Card View' : 'JSON View'}</strong></p>
                         </div>
                         <div class="meta-stat">
                             <h3>📅 Time Range</h3>
-                            <p>Start filter: ${formatDateFromEpoch(data.meta.start_epoch)}</p>
-                            <p>End filter: ${formatDateFromEpoch(data.meta.end_epoch)}</p>
-                            <p>Latest post: ${formatDateFromEpoch(data.meta.first_video_epoch)}</p>
-                            <p>Oldest post: ${formatDateFromEpoch(data.meta.last_video_epoch)}</p>
+                            <p>Latest: ${formatDateFromEpoch(data.meta.first_video_epoch)}</p>
+                            <p>Oldest: ${formatDateFromEpoch(data.meta.last_video_epoch)}</p>
                         </div>
                         <div class="meta-stat">
                             <h3>🛡️ Limits & Cache</h3>
-                            <p>Cache: ${cacheStatus}${cacheExpires ? ` (expires in ${cacheExpires})` : ''}</p>
-                            <p>Minute limit: ${minuteLimit}</p>
-                            <p>Hour limit: ${hourLimit}</p>
+                            <p>Cache: ${cacheStatus}</p>
+                            <p>Minute: ${minuteLimit}</p>
+                            <p>Hour: ${hourLimit}</p>
                         </div>
                     </div>
                 `;
             }
 
-            // Display videos
-            if (data.data && data.data.length > 0) {
-                resultsDiv.innerHTML = data.data.map(video => `
-                    <div class="video-card">
-                        <div class="video-header">
-                            <h3>📹 Video ${video.video_id}</h3>
-                            <div class="video-actions">
-                                <button class="action-btn" onclick="copyToClipboard('${video.url}')">📋 Copy Link</button>
-                                <a class="action-btn" href="${video.url}" target="_blank">🔗 Open</a>
-                            </div>
-                        </div>
-                        <p>${video.description || 'No description'}</p>
-                        <div class="video-stats">
-                            <div class="stat">
-                                <div class="stat-value">❤️ ${formatNumber(video.likes)}</div>
-                                <div class="stat-label">Likes</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">👁️ ${formatNumber(video.views)}</div>
-                                <div class="stat-label">Views</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">💬 ${formatNumber(video.comments)}</div>
-                                <div class="stat-label">Comments</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">🔁 ${formatNumber(video.shares)}</div>
-                                <div class="stat-label">Shares</div>
-                            </div>
-                        </div>
-                        <div class="video-footer">
-                            <small>Posted: ${formatDateFromEpoch(video.epoch_time_posted)}</small>
-                        </div>
-                    </div>
-                `).join('');
+            // Render pagination controls
+            renderPagination();
+
+            // Display videos based on current view
+            if (currentView === 'card') {
+                displayCardView(data.data || []);
             } else {
-                resultsDiv.innerHTML = '<div class="loading">No videos found</div>';
+                displayJsonView(data);
             }
         }
+
+        function renderPagination() {
+            const paginationHTML = createPaginationHTML();
+            document.getElementById('pagination').innerHTML = paginationHTML;
+            document.getElementById('paginationBottom').innerHTML = paginationHTML;
+        }
+
+        function createPaginationHTML() {
+            if (totalPages <= 1) return '';
+
+            let html = '<div class="pagination">';
+            
+            // Previous button
+            html += `<button onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                ⬅️ Previous
+            </button>`;
+
+            // Page numbers
+            const pageNumbers = getPageNumbers();
+            pageNumbers.forEach(pageNum => {
+                if (pageNum === '...') {
+                    html += `<span class="page-info">...</span>`;
+                } else {
+                    html += `<button 
+                        onclick="goToPage(${pageNum})" 
+                        class="${pageNum === currentPage ? 'active' : ''}">
+                        ${pageNum}
+                    </button>`;
+                }
+            });
+
+            // Next button
+            html += `<button onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                Next ➡️
+            </button>`;
+
+            // Page info
+            html += `<span class="page-info">Page ${currentPage} of ${totalPages}</span>`;
+
+            html += '</div>';
+            return html;
+        }
+
+        function getPageNumbers() {
+            const pages = [];
+            const maxVisible = 7;
+
+            if (totalPages <= maxVisible) {
+                // Show all pages
+                for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                // Show first, last, current, and some around current
+                pages.push(1);
+
+                if (currentPage > 3) {
+                    pages.push('...');
+                }
+
+                for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                    if (!pages.includes(i)) {
+                        pages.push(i);
+                    }
+                }
+
+                if (currentPage < totalPages - 2) {
+                    pages.push('...');
+                }
+
+                if (!pages.includes(totalPages)) {
+                    pages.push(totalPages);
+                }
+            }
+
+            return pages;
+        }
+
+        function goToPage(page) {
+            if (page < 1 || page > totalPages || page === currentPage) return;
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Fetch new page
+            fetchVideos(page);
+        }
+
+        function displayCardView(videos) {
+            if (!videos || videos.length === 0) {
+                resultsDiv.innerHTML = '<div style="text-align: center; padding: 40px;"><h3>No videos found</h3></div>';
+                return;
+            }
+
+            resultsDiv.className = 'results';
+            resultsDiv.innerHTML = videos.map(video => `
+                <div class="video-card">
+                    <div class="video-header">
+                        <h3>📹 ${video.video_id}</h3>
+                        <div class="video-actions">
+                            <button class="action-btn" onclick="copyToClipboard('${video.url}')">📋</button>
+                            <a class="action-btn" href="${video.url}" target="_blank">🔗</a>
+                        </div>
+                    </div>
+                    <p style="margin: 10px 0; min-height: 60px; overflow: hidden; text-overflow: ellipsis;">
+                        ${video.description || 'No description'}
+                    </p>
+                    <div class="video-stats">
+                        <div class="stat">
+                            <div style="font-size: 1.2em; margin-bottom: 5px;">❤️ ${formatNumber(video.likes)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">Likes</div>
+                        </div>
+                        <div class="stat">
+                            <div style="font-size: 1.2em; margin-bottom: 5px;">👁️ ${formatNumber(video.views)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">Views</div>
+                        </div>
+                        <div class="stat">
+                            <div style="font-size: 1.2em; margin-bottom: 5px;">💬 ${formatNumber(video.comments)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">Comments</div>
+                        </div>
+                        <div class="stat">
+                            <div style="font-size: 1.2em; margin-bottom: 5px;">🔁 ${formatNumber(video.shares)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.8;">Shares</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); text-align: center;">
+                        <small>Posted: ${formatDateFromEpoch(video.epoch_time_posted)}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayJsonView(data) {
+            resultsDiv.className = '';
+            resultsDiv.innerHTML = `
+                <div class="json-view">${JSON.stringify(data, null, 2)}</div>
+            `;
+        }
+
+        // View toggle handlers
+        document.getElementById('cardViewBtn').addEventListener('click', function() {
+            currentView = 'card';
+            document.getElementById('cardViewBtn').classList.add('active');
+            document.getElementById('jsonViewBtn').classList.remove('active');
+            if (currentData) {
+                displayCardView(currentData.data || []);
+                // Update meta info to show current view
+                displayResults(currentData);
+            }
+        });
+
+        document.getElementById('jsonViewBtn').addEventListener('click', function() {
+            currentView = 'json';
+            document.getElementById('jsonViewBtn').classList.add('active');
+            document.getElementById('cardViewBtn').classList.remove('active');
+            if (currentData) {
+                displayJsonView(currentData);
+                // Update meta info to show current view
+                displayResults(currentData);
+            }
+        });
+
+        // Export handlers
+        document.getElementById('exportJsonBtn').addEventListener('click', function() {
+            if (!currentData) {
+                showToast('No data to export', 'error');
+                return;
+            }
+
+            const dataStr = JSON.stringify(currentData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `tiktok_${currentUsername}_page${currentPage}_${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('JSON file downloaded successfully');
+        });
+
+        document.getElementById('exportCsvBtn').addEventListener('click', function() {
+            if (!allVideosData || allVideosData.length === 0) {
+                showToast('No data to export', 'error');
+                return;
+            }
+
+            // Create CSV content
+            const headers = ['Video ID', 'Description', 'URL', 'Likes', 'Views', 'Comments', 'Shares', 'Posted Date'];
+            const rows = allVideosData.map(video => [
+                video.video_id,
+                `"${(video.description || '').replace(/"/g, '""')}"`, // Escape quotes
+                video.url,
+                video.likes,
+                video.views,
+                video.comments,
+                video.shares,
+                new Date(video.epoch_time_posted * 1000).toISOString()
+            ]);
+
+            let csvContent = headers.join(',') + '\n';
+            csvContent += rows.map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `tiktok_${currentUsername}_page${currentPage}_${Date.now()}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('CSV file downloaded successfully');
+        });
 
         function formatRateLimit(bucket) {
             if (!bucket || bucket.limit === null) {
@@ -619,11 +964,7 @@
             }
             const remaining = bucket.remaining !== null ? bucket.remaining : '—';
             const limit = bucket.limit !== null ? bucket.limit : '—';
-            const resetText =
-                bucket.reset !== null && bucket.reset !== undefined
-                    ? ` (resets at ${new Date(bucket.reset * 1000).toLocaleTimeString()})`
-                    : '';
-            return `${remaining}/${limit}${resetText}`;
+            return `${remaining}/${limit}`;
         }
 
         function formatDateFromEpoch(epoch) {
@@ -659,20 +1000,6 @@
                 .then(() => showToast('Link copied to clipboard'))
                 .catch(() => showToast('Failed to copy link', 'error'));
         }
-
-        // Rate limiting
-        let lastRequestTime = 0;
-        const MIN_REQUEST_INTERVAL = 2000; // 2 seconds
-
-        form.addEventListener('submit', async (e) => {
-            const now = Date.now();
-            if (now - lastRequestTime < MIN_REQUEST_INTERVAL) {
-                e.preventDefault();
-                showToast('Please wait a moment before making another request', 'error');
-                return;
-            }
-            lastRequestTime = now;
-        });
 
         // Initialize theme toggle button
         const toggle = document.querySelector('.theme-toggle');
