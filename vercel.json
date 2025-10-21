@@ -7,10 +7,7 @@
         }
     },
     "functions": {
-        "api/**/*.js": {
-            "regions": [
-                "pdx1"
-            ],
+        "api/tiktok.js": {
             "memory": 2048,
             "maxDuration": 60
         }
