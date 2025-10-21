@@ -171,7 +171,7 @@ function normalizeCookiesFromJson(rawCookie) {
         domain: cookie.domain || '.tiktok.com',
         path: cookie.path || '/',
         expires: cookie.expires
-      }));
+      })); 
   } catch {
     return [];
   }
