@@ -25,7 +25,7 @@ const HTTP_ITEM_LIST_PAGE_SIZE = (() => {
   const raw = normalizeInteger(process.env.TIKTOK_ITEM_LIST_PAGE_SIZE, 30);
   if (Number.isNaN(raw)) {
     return 30;
-  } 
+  }  
   return Math.min(Math.max(raw, 1), 35);
 })();
 const HTTP_ITEM_LIST_MAX_PAGES = Math.max(normalizeInteger(process.env.TIKTOK_ITEM_LIST_MAX_PAGES, 40), 1);
