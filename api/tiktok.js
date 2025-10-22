@@ -34,6 +34,7 @@ const HTTP_ITEM_LIST_BUFFER_PAGES = Math.max(normalizeInteger(process.env.TIKTOK
 const RATE_LIMIT_RULES = buildRateLimitRules();
 const rateLimitState = new Map();
 const responseCache = new Map();
+const inflightRequests = new Map();
 
 let cachedExecutablePath; 
 
@@ -517,6 +518,26 @@ function storeCachedResponse(cacheKey, payload) {
   });
 }
 
+async function executeWithDeduplication(key, fetchFn) {
+  // Check if already fetching this exact request
+  if (inflightRequests.has(key)) {
+    console.log('[Dedup] Waiting for in-flight request:', key);
+    return await inflightRequests.get(key);
+  }
+  
+  // Start fetch and store promise
+  const promise = fetchFn();
+  inflightRequests.set(key, promise);
+  
+  try {
+    const result = await promise;
+    return result;
+  } finally {
+    // Clean up after 1 second to allow concurrent requests to join
+    setTimeout(() => inflightRequests.delete(key), 1000);
+  }
+}
+
 async function fetchWithRetry(url, options = {}) {
   const {
     timeoutMs = HTTP_FETCH_TIMEOUT_MS,
@@ -886,13 +907,26 @@ async function createBrowser() {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-features=site-per-process,Translate',
+      '--disable-software-rasterizer',
+      '--disable-accelerated-2d-canvas',
+      '--disable-webgl',
+      '--disable-3d-apis',
+      '--disable-features=site-per-process,Translate,BlinkGenPropertyTrees',
       '--disable-background-timer-throttling',
+      '--disable-background-networking',
       '--disable-breakpad',
       '--disable-default-apps',
       '--disable-extensions',
+      '--disable-component-extensions-with-background-pages',
       '--disable-notifications',
+      '--disable-sync',
+      '--disable-translate',
+      '--disable-animations',
+      '--disable-smooth-scrolling',
+      '--disable-blink-features=AutomationControlled',
+      '--metrics-recording-only',
       '--mute-audio',
+      '--no-first-run',
       '--lang=en-US'
     ],
     defaultViewport: DEFAULT_VIEWPORT,
@@ -912,6 +946,20 @@ async function preparePage(page, cookies) {
     'sec-ch-ua-mobile': '?0',
     'sec-ch-ua-platform': '"Windows"',
     referer: 'https://www.tiktok.com/'
+  });
+
+  // Enable request interception to block unnecessary resources
+  await page.setRequestInterception(true);
+  
+  page.on('request', (request) => {
+    const resourceType = request.resourceType();
+    
+    // Block images, media, fonts, stylesheets - we only need HTML/JSON/XHR
+    if (['image', 'media', 'font', 'stylesheet', 'manifest', 'texttrack', 'websocket'].includes(resourceType)) {
+      request.abort();
+    } else {
+      request.continue();
+    }
   });
 
   if (cookies.length) {
@@ -1422,7 +1470,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-TikTok-Cookie');
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=300');
   res.setHeader('Vary', 'Origin, X-TikTok-Cookie');
 
   const exposedHeaders = new Set(['Content-Type', 'Retry-After', 'X-Cache', 'X-Cache-Expires-In']);
@@ -1571,6 +1619,24 @@ export default async function handler(req, res) {
           http_error_message: httpError ? httpError.message : null
         }
       };
+
+      // Early browser termination - close immediately after data extraction
+      if (page) {
+        try {
+          await page.close();
+          page = null;
+        } catch (closeError) {
+          console.warn('Failed to close page early:', closeError);
+        }
+      }
+      if (browser) {
+        try {
+          await browser.close();
+          browser = null;
+        } catch (closeError) {
+          console.warn('Failed to close browser early:', closeError);
+        }
+      }
     } else if (!fetchContext.diagnostics?.source) {
       fetchContext.diagnostics = { ...(fetchContext.diagnostics ?? {}), source: 'http' };
     }
