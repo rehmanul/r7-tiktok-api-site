@@ -175,13 +175,18 @@ export default async function handler(req, res) {
   const cookies = getCookies(req);
   const cacheKey = createCacheKey(cleanUsername, cookies);
 
-  const cached = getCachedResponse(cacheKey);
-  if (cached) {
-    res.setHeader('X-Cache', 'HIT');
-    return res.status(200).json(cached);
+  // Check for fresh data request (bypasses cache)
+  const forceFresh = req.query.fresh === 'true';
+
+  if (!forceFresh) {
+    const cached = getCachedResponse(cacheKey);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.status(200).json(cached);
+    }
   }
 
-  res.setHeader('X-Cache', 'MISS');
+  res.setHeader('X-Cache', forceFresh ? 'BYPASS' : 'MISS');
 
   try {
     const bioData = await fetchBio(cleanUsername, cookies);
