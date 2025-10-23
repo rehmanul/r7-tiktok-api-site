@@ -2,7 +2,8 @@ import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium-min'; 
+import chromium from '@sparticuz/chromium-min';
+import { requireApiKey } from '../lib/auth.js'; 
 
 const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -1487,6 +1488,11 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed', status: 'error', code: 405 });
+  }
+
+  // Require API key authentication
+  if (!requireApiKey(req, res)) {
+    return;
   }
 
   const rateLimitResult = enforceRateLimit(req);

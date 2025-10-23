@@ -1,5 +1,6 @@
 // api/bio.js - Vercel Serverless Function to get TikTok user bio
 import { createHash } from 'crypto';
+import { requireApiKey } from '../lib/auth.js';
 
 const CACHE_TTL_MS = 300000; // 5 minutes
 const CACHE_MAX_ENTRIES = 100;
@@ -144,6 +145,11 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed', status: 'error', code: 405 });
+  }
+
+  // Require API key authentication
+  if (!requireApiKey(req, res)) {
+    return;
   }
 
   const username = req.query.username;
