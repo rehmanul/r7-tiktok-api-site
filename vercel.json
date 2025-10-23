@@ -14,7 +14,13 @@
     "functions": {
         "api/tiktok.js": {
             "memory": 2048,
-            "maxDuration": 60
+            "maxDuration": 60,
+            "includeFiles": "lib/**"
+        },
+        "api/bio.js": {
+            "memory": 512,
+            "maxDuration": 10,
+            "includeFiles": "lib/**"
         }
     }
 }
