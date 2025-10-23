@@ -4,7 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import handler from './api/tiktok.js';
+import tiktokHandler from './api/tiktok.js';
+import bioHandler from './api/bio.js';
+import docsHandler from './api/docs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +39,15 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/tiktok', (req, res, next) => {
-  return handler(req, res).catch(next);
+  return tiktokHandler(req, res).catch(next);
+});
+
+app.get('/api/bio', (req, res, next) => {
+  return bioHandler(req, res).catch(next);
+});
+
+app.get('/api/docs', (req, res, next) => {
+  return docsHandler(req, res).catch(next);
 });
 
 app.use('/api', (req, res) => {
