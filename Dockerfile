@@ -54,6 +54,8 @@ ENV NODE_ENV=production \
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY api ./api
+COPY lib ./lib
+COPY api-keys.json ./api-keys.json
 COPY public ./public
 COPY server.js ./server.js
 
