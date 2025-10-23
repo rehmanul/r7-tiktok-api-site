@@ -12,15 +12,16 @@
         "CHROMIUM_PACK_URL": "https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar"
     },
     "functions": {
+        "api/**/*.js": {
+            "includeFiles": "{lib/**,api-keys.json}"
+        },
         "api/tiktok.js": {
             "memory": 2048,
-            "maxDuration": 60,
-            "includeFiles": "lib/**"
+            "maxDuration": 60
         },
         "api/bio.js": {
             "memory": 512,
-            "maxDuration": 10,
-            "includeFiles": "lib/**"
+            "maxDuration": 10
         }
     }
 }
