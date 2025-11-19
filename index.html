@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎥 TikTok API - Video Scraper</title>
+    <title>🎥 Social Media API - Multi-Platform Scraper</title>
     <style>
         * {
             margin: 0;
@@ -35,8 +35,37 @@
         .subtitle {
             text-align: center;
             font-size: 1.2rem;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
             opacity: 0.9;
+        }
+
+        .platform-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .platform-tab {
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid transparent;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .platform-tab:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .platform-tab.active {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: #fff;
         }
 
         .search-box {
@@ -98,7 +127,7 @@
             margin-top: 30px;
         }
 
-        .video-card {
+        .content-card {
             background: rgba(255, 255, 255, 0.1);
             -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
@@ -108,11 +137,11 @@
             transition: transform 0.3s;
         }
 
-        .video-card:hover {
+        .content-card:hover {
             transform: translateY(-5px);
         }
 
-        .video-card a {
+        .content-card a {
             color: #fff;
             text-decoration: none;
             font-weight: 600;
@@ -120,12 +149,14 @@
             margin-bottom: 10px;
         }
 
-        .video-stats {
+        .content-stats {
             display: flex;
             justify-content: space-around;
             margin-top: 15px;
             padding-top: 15px;
             border-top: 1px solid rgba(255, 255, 255, 0.2);
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .stat {
@@ -165,30 +196,25 @@
             padding: 20px;
             margin-bottom: 20px;
         }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin: 30px 0;
-        }
-
-        .pagination button {
-            width: auto;
-            padding: 10px 20px;
-        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>🎥 TikTok API Video Scraper</h1>
-        <p class="subtitle">Fetch and analyze TikTok videos by username</p>
+        <h1>🎥 Social Media API Scraper</h1>
+        <p class="subtitle">Fetch content from TikTok, Instagram, YouTube & Twitter</p>
+
+        <div class="platform-tabs">
+            <button class="platform-tab active" data-platform="tiktok">TikTok</button>
+            <button class="platform-tab" data-platform="instagram">Instagram</button>
+            <button class="platform-tab" data-platform="youtube">YouTube</button>
+            <button class="platform-tab" data-platform="twitter">Twitter</button>
+        </div>
 
         <div class="search-box">
             <form id="searchForm">
                 <div class="form-group">
-                    <label for="username">TikTok Username (without @)</label>
+                    <label for="username" id="usernameLabel">Username (without @)</label>
                     <input type="text" id="username" placeholder="e.g., techreviews" required>
                 </div>
 
@@ -198,23 +224,49 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="perPage">Videos Per Page</label>
+                    <label for="perPage">Items Per Page</label>
                     <input type="number" id="perPage" value="10" min="1" max="100">
                 </div>
 
-                <button type="submit" id="submitBtn">🔍 Fetch Videos</button>
+                <button type="submit" id="submitBtn">🔍 Fetch Content</button>
             </form>
         </div>
 
         <div id="metaInfo"></div>
-        <div id="results"></div>
+        <div id="results" class="results"></div>
     </div>
 
     <script>
+        let currentPlatform = 'tiktok';
         const form = document.getElementById('searchForm');
         const resultsDiv = document.getElementById('results');
         const metaInfoDiv = document.getElementById('metaInfo');
         const submitBtn = document.getElementById('submitBtn');
+        const usernameLabel = document.getElementById('usernameLabel');
+        const usernameInput = document.getElementById('username');
+
+        // Platform tabs
+        document.querySelectorAll('.platform-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentPlatform = tab.dataset.platform;
+                updatePlaceholders();
+            });
+        });
+
+        function updatePlaceholders() {
+            const placeholders = {
+                tiktok: { label: 'TikTok Username (without @)', placeholder: 'e.g., techreviews' },
+                instagram: { label: 'Instagram Username (without @)', placeholder: 'e.g., natgeo' },
+                youtube: { label: 'YouTube Channel Handle (with @)', placeholder: 'e.g., @MrBeast' },
+                twitter: { label: 'Twitter/X Username (without @)', placeholder: 'e.g., elonmusk' }
+            };
+
+            const config = placeholders[currentPlatform];
+            usernameLabel.textContent = config.label;
+            usernameInput.placeholder = config.placeholder;
+        }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -231,74 +283,154 @@
             // Show loading
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳ Loading...';
-            resultsDiv.innerHTML = '<div class="loading">Fetching videos...</div>';
+            resultsDiv.innerHTML = '<div class="loading">Fetching content...</div>';
             metaInfoDiv.innerHTML = '';
 
             try {
-                const url = `/api/tiktok?username=${encodeURIComponent(username)}&page=${page}&per-page=${perPage}`;
+                const endpoint = currentPlatform === 'youtube' ? 'channel' : 'username';
+                const url = `/api/${currentPlatform}?${endpoint}=${encodeURIComponent(username)}&page=${page}&per-page=${perPage}`;
                 const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.status === 'error') {
-                    throw new Error(data.error || 'Failed to fetch videos');
+                    throw new Error(data.error || 'Failed to fetch content');
                 }
 
                 // Display meta information
                 if (data.meta) {
+                    const identifier = data.meta.username || data.meta.channel || username;
+                    const totalLabel = getTotalLabel(currentPlatform);
                     metaInfoDiv.innerHTML = `
-            <div class="meta-info">
-              <h3>📊 Results for @${data.meta.username}</h3>
-              <p>Page ${data.meta.page} of ${data.meta.total_pages} | Total Posts: ${data.meta.total_posts}</p>
-            </div>
-          `;
+                        <div class="meta-info">
+                            <h3>📊 Results for @${identifier}</h3>
+                            <p>Page ${data.meta.page} of ${data.meta.total_pages} | Total ${totalLabel}: ${data.meta.total_posts || data.meta.total_videos || data.meta.total_tweets || 0}</p>
+                            <p>Fetch Method: ${data.meta.fetch_method || 'N/A'}</p>
+                        </div>
+                    `;
                 }
 
-                // Display videos
+                // Display content
                 if (data.data && data.data.length > 0) {
-                    resultsDiv.innerHTML = data.data.map(video => `
-            <div class="video-card">
-              <a href="${video.url}" target="_blank">
-                📹 Video ${video.video_id}
-              </a>
-              <p>${video.description || 'No description'}</p>
-              <div class="video-stats">
-                <div class="stat">
-                  <div class="stat-value">❤️ ${formatNumber(video.likes)}</div>
-                  <div class="stat-label">Likes</div>
-                </div>
-                <div class="stat">
-                  <div class="stat-value">👁️ ${formatNumber(video.views)}</div>
-                  <div class="stat-label">Views</div>
-                </div>
-                <div class="stat">
-                  <div class="stat-value">💬 ${formatNumber(video.comments)}</div>
-                  <div class="stat-label">Comments</div>
-                </div>
-                <div class="stat">
-                  <div class="stat-value">🔁 ${formatNumber(video.shares)}</div>
-                  <div class="stat-label">Shares</div>
-                </div>
-              </div>
-            </div>
-          `).join('');
+                    resultsDiv.innerHTML = data.data.map(item => renderContentCard(item, currentPlatform)).join('');
                 } else {
-                    resultsDiv.innerHTML = '<div class="loading">No videos found</div>';
+                    resultsDiv.innerHTML = '<div class="loading">No content found</div>';
                 }
 
             } catch (error) {
                 resultsDiv.innerHTML = `
-          <div class="error">
-            <h3>❌ Error</h3>
-            <p>${error.message}</p>
-          </div>
-        `;
+                    <div class="error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = '🔍 Fetch Videos';
+                submitBtn.textContent = '🔍 Fetch Content';
             }
         });
 
+        function getTotalLabel(platform) {
+            const labels = {
+                tiktok: 'Videos',
+                instagram: 'Posts',
+                youtube: 'Videos',
+                twitter: 'Tweets'
+            };
+            return labels[platform] || 'Items';
+        }
+
+        function renderContentCard(item, platform) {
+            const id = item.video_id || item.post_id || item.tweet_id || 'N/A';
+            const text = item.description || item.caption || item.text || item.title || 'No description';
+            const url = item.url || '#';
+
+            let statsHTML = '';
+
+            if (platform === 'tiktok') {
+                statsHTML = `
+                    <div class="stat">
+                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
+                        <div class="stat-label">Likes</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
+                        <div class="stat-label">Views</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
+                        <div class="stat-label">Comments</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">🔁 ${formatNumber(item.shares)}</div>
+                        <div class="stat-label">Shares</div>
+                    </div>
+                `;
+            } else if (platform === 'instagram') {
+                statsHTML = `
+                    <div class="stat">
+                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
+                        <div class="stat-label">Likes</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
+                        <div class="stat-label">Comments</div>
+                    </div>
+                    ${item.views ? `<div class="stat">
+                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
+                        <div class="stat-label">Views</div>
+                    </div>` : ''}
+                `;
+            } else if (platform === 'youtube') {
+                statsHTML = `
+                    ${item.views ? `<div class="stat">
+                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
+                        <div class="stat-label">Views</div>
+                    </div>` : ''}
+                    ${item.likes ? `<div class="stat">
+                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
+                        <div class="stat-label">Likes</div>
+                    </div>` : ''}
+                    ${item.comments ? `<div class="stat">
+                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
+                        <div class="stat-label">Comments</div>
+                    </div>` : ''}
+                `;
+            } else if (platform === 'twitter') {
+                statsHTML = `
+                    ${item.likes ? `<div class="stat">
+                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
+                        <div class="stat-label">Likes</div>
+                    </div>` : ''}
+                    ${item.retweets ? `<div class="stat">
+                        <div class="stat-value">🔁 ${formatNumber(item.retweets)}</div>
+                        <div class="stat-label">Retweets</div>
+                    </div>` : ''}
+                    ${item.replies ? `<div class="stat">
+                        <div class="stat-value">💬 ${formatNumber(item.replies)}</div>
+                        <div class="stat-label">Replies</div>
+                    </div>` : ''}
+                    ${item.views ? `<div class="stat">
+                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
+                        <div class="stat-label">Views</div>
+                    </div>` : ''}
+                `;
+            }
+
+            return `
+                <div class="content-card">
+                    <a href="${url}" target="_blank">
+                        📹 ${platform.toUpperCase()} #${id}
+                    </a>
+                    <p>${text.slice(0, 200)}${text.length > 200 ? '...' : ''}</p>
+                    <div class="content-stats">
+                        ${statsHTML}
+                    </div>
+                </div>
+            `;
+        }
+
         function formatNumber(num) {
+            if (!num && num !== 0) return 'N/A';
             if (num >= 1000000) {
                 return (num / 1000000).toFixed(1) + 'M';
             }
@@ -307,6 +439,9 @@
             }
             return num.toString();
         }
+
+        // Initialize
+        updatePlaceholders();
     </script>
 </body>
 

@@ -7,13 +7,23 @@
         }
     },
     "env": {
-        "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x",
-        "PUPPETEER_CACHE_DIR": "/tmp/chromium-cache",
-        "CHROMIUM_PACK_URL": "https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar"
+        "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x"
     },
     "functions": {
         "api/tiktok.js": {
-            "memory": 3008,
+            "memory": 2048,
+            "maxDuration": 60
+        },
+        "api/instagram.js": {
+            "memory": 2048,
+            "maxDuration": 60
+        },
+        "api/youtube.js": {
+            "memory": 2048,
+            "maxDuration": 60
+        },
+        "api/twitter.js": {
+            "memory": 2048,
             "maxDuration": 60
         }
     }

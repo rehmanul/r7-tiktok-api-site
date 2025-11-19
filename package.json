@@ -14,7 +14,7 @@
     "lint": "echo 'Lint passed'"
   },
   "dependencies": {
-    "@sparticuz/chromium-min": "^141.0.0",
+    "@sparticuz/chromium": "^141.0.0",
     "compression": "^1.8.1",
     "express": "^5.1.0",
     "helmet": "^8.1.0",

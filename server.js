@@ -4,7 +4,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import handler from './api/tiktok.js';
+import tiktokHandler from './api/tiktok.js';
+import instagramHandler from './api/instagram.js';
+import youtubeHandler from './api/youtube.js';
+import twitterHandler from './api/twitter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,12 +35,25 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    version: process.env.npm_package_version || 'unknown'
+    version: process.env.npm_package_version || 'unknown',
+    platforms: ['tiktok', 'instagram', 'youtube', 'twitter']
   });
 });
 
 app.get('/api/tiktok', (req, res, next) => {
-  return handler(req, res).catch(next);
+  return tiktokHandler(req, res).catch(next);
+});
+
+app.get('/api/instagram', (req, res, next) => {
+  return instagramHandler(req, res).catch(next);
+});
+
+app.get('/api/youtube', (req, res, next) => {
+  return youtubeHandler(req, res).catch(next);
+});
+
+app.get('/api/twitter', (req, res, next) => {
+  return twitterHandler(req, res).catch(next);
 });
 
 app.use('/api', (req, res) => {
