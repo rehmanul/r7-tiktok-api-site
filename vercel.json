@@ -10,6 +10,9 @@
         "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x"
     },
     "functions": {
+        "api/**/*.js": {
+            "includeFiles": "{lib/**,api-keys.json}"
+        },
         "api/tiktok.js": {
             "memory": 2048,
             "maxDuration": 60
@@ -25,6 +28,10 @@
         "api/twitter.js": {
             "memory": 2048,
             "maxDuration": 60
+        },
+        "api/bio.js": {
+            "memory": 512,
+            "maxDuration": 10
         }
     }
 }

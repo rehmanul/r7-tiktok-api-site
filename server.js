@@ -8,6 +8,8 @@ import tiktokHandler from './api/tiktok.js';
 import instagramHandler from './api/instagram.js';
 import youtubeHandler from './api/youtube.js';
 import twitterHandler from './api/twitter.js';
+import bioHandler from './api/bio.js';
+import docsHandler from './api/docs.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +56,14 @@ app.get('/api/youtube', (req, res, next) => {
 
 app.get('/api/twitter', (req, res, next) => {
   return twitterHandler(req, res).catch(next);
+});
+
+app.get('/api/bio', (req, res, next) => {
+  return bioHandler(req, res).catch(next);
+});
+
+app.get('/api/docs', (req, res, next) => {
+  return docsHandler(req, res).catch(next);
 });
 
 app.use('/api', (req, res) => {

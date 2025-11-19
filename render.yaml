@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: tiktok-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22.x
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+      - key: PUPPETEER_CACHE_DIR
+        value: /tmp/chromium-cache
+      - key: CHROMIUM_PACK_URL
+        value: https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar
+
