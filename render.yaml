@@ -1,18 +1,28 @@
 services:
   - type: web
-    name: tiktok-api
+    name: social-media-api
     env: node
     region: oregon
     plan: free
     buildCommand: npm install
     startCommand: node server.js
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: NODE_VERSION
         value: 22.x
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: true
+        value: "true"
       - key: PUPPETEER_CACHE_DIR
         value: /tmp/chromium-cache
       - key: CHROMIUM_PACK_URL
         value: https://github.com/Sparticuz/chromium/releases/download/v141.0.0/chromium-v141.0.0-pack.tar
+      - key: CACHE_TTL
+        value: "180"
+      - key: CACHE_MAX_ENTRIES
+        value: "100"
+      - key: RATE_LIMIT_REQUESTS_PER_MINUTE
+        value: "60"
+      - key: RATE_LIMIT_REQUESTS_PER_HOUR
+        value: "1000"
 
