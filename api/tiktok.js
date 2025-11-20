@@ -681,12 +681,12 @@ async function fetchItemListBatchHttp({ userInfo, cookieMap, cursor, count, user
   const responseText = await response.text();
 
   // ALWAYS log the response for debugging
-  console.log('=== TikTok API Debug ===');
-  console.log('Status:', status);
-  console.log('Response length:', responseText.length);
-  console.log('Response preview (first 500 chars):', responseText.slice(0, 500));
-  console.log('Response is empty:', responseText.length === 0);
-  console.log('========================');
+  console.error('=== TikTok API Debug ===');
+  console.error('Status:', status);
+  console.error('Response length:', responseText.length);
+  console.error('Response preview (first 500 chars):', responseText.slice(0, 500));
+  console.error('Response is empty:', responseText.length === 0);
+  console.error('========================');
 
   if (status === 404) {
     const error = new Error('TikTok returned 404 while fetching item list');
