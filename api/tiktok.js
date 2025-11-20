@@ -686,57 +686,66 @@ async function fetchItemListBatchHttp({ userInfo, cookieMap, cursor, count, user
 
   const responseText = await response.text();
 
-  // ALWAYS log the response for debugging
-  console.error('=== TikTok API Debug ===');
-  console.error('Status:', status);
-  console.error('Response length:', responseText.length);
-  console.error('Response preview (first 500 chars):', responseText.slice(0, 500));
-  console.error('Response is empty:', responseText.length === 0);
-  console.error('========================');
+  // ✅ CRITICAL FIX: Handle empty responses gracefully (don't throw)
+  if (responseText.length === 0) {
+    console.warn('[TikTok API] Empty response - TikTok API blocking detected. Using embedded videos only.');
+    return {
+      items: [],
+      cursor: '',
+      hasMore: false,
+      extra: null
+    };
+  }
 
   if (status === 404) {
-    const error = new Error('TikTok returned 404 while fetching item list');
-    error.code = 'ITEM_LIST_NOT_FOUND';
-    throw error;
+    console.warn('[TikTok API] 404 response - API endpoint may have changed');
+    return {
+      items: [],
+      cursor: '',
+      hasMore: false,
+      extra: null
+    };
   }
 
   if (!response.ok) {
     const snippet = responseText.slice(0, 200);
-    const error = new Error(
-      `Failed to fetch TikTok item list (status ${status})${snippet ? `: ${snippet}` : ''}`
-    );
-    error.code = 'ITEM_LIST_HTTP_ERROR';
-    throw error;
+    console.warn(`[TikTok API] HTTP ${status} error: ${snippet}`);
+    return {
+      items: [],
+      cursor: '',
+      hasMore: false,
+      extra: null
+    };
   }
 
-  // Handle empty responses gracefully - return empty array instead of throwing
-  if (responseText.length === 0) {
-    console.warn('[TikTok API] Empty response - API may be blocking. Using embedded videos only.');
-    return { items: [], cursor: '', hasMore: false, extra: null };
-  }
-
+  // ✅ CRITICAL FIX: Gracefully handle JSON parse errors
   let payload;
   try {
     payload = JSON.parse(responseText);
   } catch (error) {
-    // Log the actual response for debugging
-    console.error('[TikTok API] JSON PARSE FAILED!');
-    console.error('[TikTok API] Response (first 500 chars):', responseText.slice(0, 500));
-    console.error('[TikTok API] Response length:', responseText.length);
-    console.error('[TikTok API] Response headers:', Object.fromEntries(response.headers.entries()));
-
-    // Gracefully return empty instead of throwing
-    console.warn('[TikTok API] Returning empty result due to parse error - will use embedded videos');
-    return { items: [], cursor: '', hasMore: false, extra: null };
+    console.warn('[TikTok API] JSON parse failed - response may be HTML/CAPTCHA. Falling back to embedded videos.');
+    console.warn('[TikTok API] Response preview:', responseText.slice(0, 200));
+    return {
+      items: [],
+      cursor: '',
+      hasMore: false,
+      extra: null
+    };
   }
 
+  // Check for non-zero status codes
   if (payload && typeof payload.statusCode === 'number' && payload.statusCode !== 0) {
-    const error = new Error(`TikTok item list responded with status code ${payload.statusCode}`);
-    error.code = `ITEM_LIST_STATUS_${payload.statusCode}`;
-    throw error;
+    console.warn(`[TikTok API] Non-zero status code ${payload.statusCode} - API may be restricted`);
+    return {
+      items: [],
+      cursor: '',
+      hasMore: false,
+      extra: null
+    };
   }
 
   const items = Array.isArray(payload?.itemList) ? payload.itemList : [];
+  console.log(`[TikTok API] Fetched ${items.length} items from API`);
 
   return {
     items,
@@ -797,21 +806,26 @@ async function seedInitialCookies(cookieMap) {
   }
 }
 
+// ✅ FIXED: New strategy prioritizing embedded videos
 async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, startEpoch, endEpoch }) {
   const cookieMap = createCookieMap(cookies);
+
+  // ✅ CRITICAL: Always seed fresh cookies before any request
   await seedInitialCookies(cookieMap);
+
   const profileResult = await fetchProfileMetadataHttp({ username, cookieMap });
   const userInfo = profileResult.userInfo;
   const totalVideoCount = resolveTotalVideoCount(userInfo.stats ?? userInfo.statsV2);
 
-  // PRIMARY STRATEGY: Use embedded videos from profile HTML (bypasses the empty API response issue)
+  // ✅ PRIMARY DATA SOURCE: Use embedded videos from profile HTML
   const aggregatedRawVideos = profileResult.embeddedVideos || [];
-  console.log(`[PRIMARY FETCH] Extracted ${aggregatedRawVideos.length} embedded videos from profile HTML`);
+  console.log(`[Fetch Strategy] Starting with ${aggregatedRawVideos.length} embedded videos (PRIMARY SOURCE)`);
 
-  // If we have enough embedded videos, use them without calling the API
   const targetItems = Math.max(pageNum * perPageNum, perPageNum);
+
+  // ✅ If we have enough embedded videos, skip API calls entirely
   if (aggregatedRawVideos.length >= targetItems) {
-    console.log(`[PRIMARY FETCH] ✅ Sufficient videos (${aggregatedRawVideos.length} >= ${targetItems}) - skipping API calls`);
+    console.log(`[Fetch Strategy] ✓ Sufficient embedded videos (${aggregatedRawVideos.length}/${targetItems}) - skipping API`);
     const normalizedVideos = normalizeVideos(aggregatedRawVideos, username);
     normalizedVideos.sort((a, b) => {
       const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
@@ -823,7 +837,7 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
       videos: normalizedVideos,
       profileInfo: userInfo,
       diagnostics: {
-        source: 'http_embedded',
+        source: 'html_embedded_only',
         iterations: 0,
         fetched_batches: 0,
         fetched_items: normalizedVideos.length,
@@ -834,69 +848,61 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
     };
   }
 
-  // SECONDARY STRATEGY: If we need more videos, try API calls (though they may return empty)
-  console.log(`[SECONDARY FETCH] Need more videos (${aggregatedRawVideos.length} < ${targetItems}) - attempting API calls`);
+  // ✅ SECONDARY: Try API calls as supplement (with graceful failure handling)
+  const needed = targetItems - aggregatedRawVideos.length;
+  console.log(`[Fetch Strategy] Need ${needed} more videos - trying API as supplement`);
+
   let cursor = '0';
   let hasMore = true;
   let iterations = 0;
+  let apiSuccessCount = 0;
 
-  const desiredTotal =
-    typeof totalVideoCount === 'number'
-      ? totalVideoCount
-      : targetItems + HTTP_ITEM_LIST_PAGE_SIZE * HTTP_ITEM_LIST_BUFFER_PAGES;
+  // Limit API attempts to avoid wasting time on failed calls
+  const maxApiAttempts = Math.min(HTTP_ITEM_LIST_MAX_PAGES, 3);
 
-  while (hasMore && iterations < HTTP_ITEM_LIST_MAX_PAGES) {
-    const batch = await fetchItemListBatchHttp({
-      userInfo,
-      cookieMap,
-      cursor,
-      count: HTTP_ITEM_LIST_PAGE_SIZE,
-      username
-    });
+  while (hasMore && iterations < maxApiAttempts && aggregatedRawVideos.length < targetItems) {
+    try {
+      const batch = await fetchItemListBatchHttp({
+        userInfo,
+        cookieMap,
+        cursor,
+        count: HTTP_ITEM_LIST_PAGE_SIZE,
+        username
+      });
 
-    if (batch.items.length) {
-      aggregatedRawVideos.push(...batch.items);
-    }
+      if (batch.items.length > 0) {
+        aggregatedRawVideos.push(...batch.items);
+        apiSuccessCount++;
+        console.log(`[API Supplement] ✓ Batch ${iterations + 1}: fetched ${batch.items.length} items`);
+      } else {
+        console.log(`[API Supplement] ✗ Batch ${iterations + 1}: empty response`);
+      }
 
-    hasMore = batch.hasMore;
-    cursor = batch.cursor || '';
-    iterations += 1;
+      hasMore = batch.hasMore;
+      cursor = batch.cursor || '';
+      iterations += 1;
 
-    if (!hasMore || !cursor) {
-      break;
-    }
-
-    if (!startEpoch && !endEpoch) {
-      if (aggregatedRawVideos.length >= desiredTotal) {
+      // Stop if no more data or cursor is empty
+      if (!hasMore || !cursor) {
+        console.log(`[API Supplement] Stopping - hasMore: ${hasMore}, cursor: ${cursor ? 'present' : 'empty'}`);
         break;
       }
-      if (typeof totalVideoCount === 'number' && aggregatedRawVideos.length >= totalVideoCount) {
+
+      // Stop if we have enough
+      if (aggregatedRawVideos.length >= targetItems) {
+        console.log(`[API Supplement] ✓ Target reached: ${aggregatedRawVideos.length}/${targetItems}`);
         break;
       }
-      continue;
-    }
 
-    const normalizedSoFar = normalizeVideos(aggregatedRawVideos, username);
-    normalizedSoFar.sort((a, b) => {
-      const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
-      const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
-      return bTime - aTime;
-    });
-
-    const filteredSoFar = filterVideosByEpoch(normalizedSoFar, startEpoch, endEpoch);
-    const enoughFiltered = filteredSoFar.length >= targetItems + perPageNum;
-    if (enoughFiltered) {
-      break;
-    }
-
-    if (typeof totalVideoCount === 'number' && aggregatedRawVideos.length >= totalVideoCount) {
-      break;
-    }
-
-    if (aggregatedRawVideos.length >= desiredTotal) {
+    } catch (error) {
+      console.warn(`[API Supplement] Batch ${iterations + 1} failed:`, error.message);
+      // Don't throw - we have embedded videos as fallback
       break;
     }
   }
+
+  const sourceName = apiSuccessCount > 0 ? 'html_embedded+api' : 'html_embedded_only';
+  console.log(`[Fetch Complete] Total: ${aggregatedRawVideos.length} videos (${apiSuccessCount} successful API batches) - Source: ${sourceName}`);
 
   const normalizedVideos = normalizeVideos(aggregatedRawVideos, username);
   normalizedVideos.sort((a, b) => {
@@ -909,9 +915,9 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
     videos: normalizedVideos,
     profileInfo: userInfo,
     diagnostics: {
-      source: 'http',
+      source: sourceName,
       iterations,
-      fetched_batches: iterations,
+      fetched_batches: apiSuccessCount,
       fetched_items: normalizedVideos.length,
       has_more: hasMore,
       last_cursor: cursor || null,
