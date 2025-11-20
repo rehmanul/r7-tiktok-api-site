@@ -1074,7 +1074,25 @@ async function preparePage(page, cookies) {
   });
 
   if (cookies.length) {
-    await page.setCookie(...cookies);
+    try {
+      // Filter out cookies that might be restricted by remote browsers (Bright Data)
+      const safeCookies = cookies.filter(cookie => {
+        // Skip cmpl_token when using remote browser - it's auto-managed
+        if (cookie.name === 'cmpl_token' && process.env.USE_BRIGHTDATA === 'true') {
+          console.log('[TikTok Browser] Skipping cmpl_token cookie (managed by remote browser)');
+          return false;
+        }
+        return true;
+      });
+
+      if (safeCookies.length > 0) {
+        await page.setCookie(...safeCookies);
+        console.log(`[TikTok Browser] Set ${safeCookies.length} cookies`);
+      }
+    } catch (error) {
+      console.warn('[TikTok Browser] Failed to set some cookies:', error.message);
+      // Continue anyway - cookies help but aren't strictly required
+    }
   }
 }
 
