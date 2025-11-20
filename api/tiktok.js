@@ -1406,15 +1406,49 @@ async function collectVideoData(page, username, options = {}) {
 
   await delay(CONTENT_WAIT_MS);
 
+  // CRITICAL: Scroll to trigger TikTok's JavaScript to load videos naturally
+  // This allows TikTok's code to generate X-Bogus automatically
+  console.log('[TikTok Browser] Scrolling to load videos...');
+  let previousVideoCount = 0;
+  let scrollAttempts = 0;
+  const maxScrollAttempts = 10;
+
+  while (scrollAttempts < maxScrollAttempts) {
+    await page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+    await delay(2000); // Wait for content to load
+
+    // Check how many videos are loaded via API responses
+    const currentVideoCount = apiResponses.length;
+    console.log(`[TikTok Browser] Scroll ${scrollAttempts + 1}: ${currentVideoCount} API responses`);
+
+    if (currentVideoCount === previousVideoCount) {
+      console.log(`[TikTok Browser] No new API responses, stopping scroll`);
+      break;
+    }
+
+    previousVideoCount = currentVideoCount;
+    scrollAttempts++;
+
+    // Stop if we have enough
+    if (apiResponses.length >= targetItems / HTTP_ITEM_LIST_PAGE_SIZE) {
+      break;
+    }
+  }
+
   let videos = extractVideosFromApiResponses(apiResponses);
+  console.log(`[TikTok Browser] Extracted ${videos.length} videos from ${apiResponses.length} API responses`);
 
   if (!videos.length) {
     const sigiState = await extractSigiState(page);
     videos = extractVideosFromSigiState(sigiState);
+    console.log(`[TikTok Browser] Extracted ${videos.length} videos from SIGI state`);
   }
 
   if (!videos.length) {
     videos = await extractVideosFromDom(page);
+    console.log(`[TikTok Browser] Extracted ${videos.length} videos from DOM`);
   }
 
   let profileInfo = null;
