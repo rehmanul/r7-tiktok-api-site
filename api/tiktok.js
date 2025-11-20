@@ -709,19 +709,25 @@ async function fetchItemListBatchHttp({ userInfo, cookieMap, cursor, count, user
     throw error;
   }
 
+  // Handle empty responses gracefully - return empty array instead of throwing
+  if (responseText.length === 0) {
+    console.warn('[TikTok API] Empty response - API may be blocking. Using embedded videos only.');
+    return { items: [], cursor: '', hasMore: false, extra: null };
+  }
+
   let payload;
   try {
     payload = JSON.parse(responseText);
   } catch (error) {
     // Log the actual response for debugging
-    console.error('JSON PARSE FAILED!');
-    console.error('TikTok API Response (first 500 chars):', responseText.slice(0, 500));
-    console.error('Response length:', responseText.length);
-    console.error('Response headers:', Object.fromEntries(response.headers.entries()));
-    const parseError = new Error('Unable to parse TikTok item list response JSON');
-    parseError.code = 'ITEM_LIST_PARSE_ERROR';
-    parseError.cause = error;
-    throw parseError;
+    console.error('[TikTok API] JSON PARSE FAILED!');
+    console.error('[TikTok API] Response (first 500 chars):', responseText.slice(0, 500));
+    console.error('[TikTok API] Response length:', responseText.length);
+    console.error('[TikTok API] Response headers:', Object.fromEntries(response.headers.entries()));
+
+    // Gracefully return empty instead of throwing
+    console.warn('[TikTok API] Returning empty result due to parse error - will use embedded videos');
+    return { items: [], cursor: '', hasMore: false, extra: null };
   }
 
   if (payload && typeof payload.statusCode === 'number' && payload.statusCode !== 0) {
@@ -767,9 +773,10 @@ async function seedInitialCookies(cookieMap) {
   if (!(cookieMap instanceof Map)) {
     return;
   }
-  if (cookieMap.has('ttwid') && cookieMap.has('msToken')) {
-    return;
-  }
+
+  // ALWAYS refresh cookies for better results - don't check if they exist
+  console.log('[Cookie Seed] Fetching fresh TikTok cookies...');
+  console.log(`[Cookie Seed] Current cookie count: ${cookieMap.size}`);
 
   const cookieHeader = serializeCookieMap(cookieMap);
   const headers = buildHtmlRequestHeaders({ cookieHeader, referer: 'https://www.tiktok.com/' });
@@ -783,8 +790,10 @@ async function seedInitialCookies(cookieMap) {
     const setCookieValues =
       typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
     applySetCookieHeaders(cookieMap, setCookieValues);
+    console.log(`[Cookie Seed] Updated cookie count: ${cookieMap.size}`);
+    console.log(`[Cookie Seed] New cookies received: ${setCookieValues.length}`);
   } catch (error) {
-    console.warn('Unable to pre-seed TikTok cookies:', error);
+    console.warn('[Cookie Seed] Unable to pre-seed TikTok cookies:', error);
   }
 }
 
@@ -795,14 +804,14 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
   const userInfo = profileResult.userInfo;
   const totalVideoCount = resolveTotalVideoCount(userInfo.stats ?? userInfo.statsV2);
 
-  // Use embedded videos from profile HTML (bypasses the empty API response issue)
+  // PRIMARY STRATEGY: Use embedded videos from profile HTML (bypasses the empty API response issue)
   const aggregatedRawVideos = profileResult.embeddedVideos || [];
-  console.log(`Starting with ${aggregatedRawVideos.length} embedded videos from profile HTML`);
+  console.log(`[PRIMARY FETCH] Extracted ${aggregatedRawVideos.length} embedded videos from profile HTML`);
 
   // If we have enough embedded videos, use them without calling the API
   const targetItems = Math.max(pageNum * perPageNum, perPageNum);
   if (aggregatedRawVideos.length >= targetItems) {
-    console.log(`Using embedded videos only (no API calls needed)`);
+    console.log(`[PRIMARY FETCH] ✅ Sufficient videos (${aggregatedRawVideos.length} >= ${targetItems}) - skipping API calls`);
     const normalizedVideos = normalizeVideos(aggregatedRawVideos, username);
     normalizedVideos.sort((a, b) => {
       const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
@@ -825,7 +834,8 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
     };
   }
 
-  // If we need more videos, try API calls (though they may return empty)
+  // SECONDARY STRATEGY: If we need more videos, try API calls (though they may return empty)
+  console.log(`[SECONDARY FETCH] Need more videos (${aggregatedRawVideos.length} < ${targetItems}) - attempting API calls`);
   let cursor = '0';
   let hasMore = true;
   let iterations = 0;
