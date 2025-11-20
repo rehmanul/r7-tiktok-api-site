@@ -1820,6 +1820,7 @@ export default async function handler(req, res) {
         console.log(`[TikTok] Browser fetch complete: ${normalizedVideos.length} videos`);
       } catch (browserError) {
         console.warn('[TikTok] Browser primary fetch failed, falling back to HTTP:', browserError.message);
+        console.error('[TikTok] Browser error details:', browserError);
         httpError = browserError;
       }
     }
@@ -1835,6 +1836,12 @@ export default async function handler(req, res) {
           startEpoch,
           endEpoch
         });
+
+        // Add browser error info to diagnostics if browser failed
+        if (httpError && fetchContext?.diagnostics) {
+          fetchContext.diagnostics.browser_error = httpError.message;
+          fetchContext.diagnostics.browser_attempted = useBrowserPrimary;
+        }
       } catch (error) {
         httpError = error instanceof Error ? error : new Error(String(error));
         console.warn('HTTP fetch failed, attempting browser fallback:', httpError);
@@ -1958,6 +1965,11 @@ export default async function handler(req, res) {
 
     if (diagnostics.http_error_message || diagnostics.http_error_code) {
       responsePayload.meta.http_fallback_reason = diagnostics.http_error_message ?? diagnostics.http_error_code;
+    }
+
+    if (diagnostics.browser_error) {
+      responsePayload.meta.browser_error = diagnostics.browser_error;
+      responsePayload.meta.browser_attempted = diagnostics.browser_attempted ?? false;
     }
 
     storeCachedResponse(cacheKey, responsePayload);
