@@ -988,6 +988,24 @@ async function resolveExecutablePath() {
 }
 
 async function createBrowser() {
+  // ✅ BRIGHT DATA: Use residential proxy browser if configured
+  if (process.env.USE_BRIGHTDATA === 'true' && process.env.BRIGHTDATA_BROWSER_URL) {
+    console.log('[Browser] 🌟 Using Bright Data residential proxy browser');
+    console.log('[Browser] Benefits: Residential IPs, rotating proxies, bypasses datacenter blocking');
+
+    try {
+      return await puppeteer.connect({
+        browserWSEndpoint: process.env.BRIGHTDATA_BROWSER_URL,
+        defaultViewport: DEFAULT_VIEWPORT
+      });
+    } catch (error) {
+      console.warn('[Browser] ⚠️ Bright Data connection failed, falling back to local Chromium:', error.message);
+      // Fall through to local Chromium
+    }
+  }
+
+  // Fallback: Use local Chromium (datacenter IP - may be blocked by TikTok)
+  console.log('[Browser] Using local Chromium (datacenter IP - may be blocked)');
   ensureChromiumCacheDir();
 
   const executablePath = await resolveExecutablePath();

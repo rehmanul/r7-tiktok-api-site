@@ -673,6 +673,24 @@ function resolveExecutablePath() {
 }
 
 async function createBrowser() {
+  // ✅ BRIGHT DATA: Use residential proxy browser if configured
+  if (process.env.USE_BRIGHTDATA === 'true' && process.env.BRIGHTDATA_BROWSER_URL) {
+    console.log('[Instagram Browser] 🌟 Using Bright Data residential proxy browser');
+    console.log('[Instagram Browser] Benefits: Residential IPs, rotating proxies, bypasses datacenter blocking');
+
+    try {
+      return await puppeteer.connect({
+        browserWSEndpoint: process.env.BRIGHTDATA_BROWSER_URL,
+        defaultViewport: DEFAULT_VIEWPORT
+      });
+    } catch (error) {
+      console.warn('[Instagram Browser] ⚠️ Bright Data connection failed, falling back to local Chromium:', error.message);
+      // Fall through to local Chromium
+    }
+  }
+
+  // Fallback: Use local Chromium (datacenter IP - may be blocked by Instagram)
+  console.log('[Instagram Browser] Using local Chromium (datacenter IP - may be blocked)');
   ensureChromiumCacheDir();
 
   const executablePath = await resolveExecutablePath();
