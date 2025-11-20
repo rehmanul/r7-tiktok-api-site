@@ -628,7 +628,13 @@ async function fetchProfileMetadataHttp({ username, cookieMap }) {
         error.code = 'PROFILE_NOT_FOUND';
         throw error;
       }
-      return { userInfo, html };
+
+      // Extract videos from the profile page HTML (embedded data)
+      const itemModule = universalData?.__DEFAULT_SCOPE__?.['webapp.user-detail']?.itemModule || {};
+      const embeddedVideos = Object.values(itemModule).filter(item => item && item.id);
+      console.log(`Extracted ${embeddedVideos.length} videos from profile HTML`);
+
+      return { userInfo, html, embeddedVideos };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt >= 2) {
@@ -789,12 +795,41 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
   const userInfo = profileResult.userInfo;
   const totalVideoCount = resolveTotalVideoCount(userInfo.stats ?? userInfo.statsV2);
 
-  const aggregatedRawVideos = [];
+  // Use embedded videos from profile HTML (bypasses the empty API response issue)
+  const aggregatedRawVideos = profileResult.embeddedVideos || [];
+  console.log(`Starting with ${aggregatedRawVideos.length} embedded videos from profile HTML`);
+
+  // If we have enough embedded videos, use them without calling the API
+  const targetItems = Math.max(pageNum * perPageNum, perPageNum);
+  if (aggregatedRawVideos.length >= targetItems) {
+    console.log(`Using embedded videos only (no API calls needed)`);
+    const normalizedVideos = normalizeVideos(aggregatedRawVideos, username);
+    normalizedVideos.sort((a, b) => {
+      const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
+      const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
+      return bTime - aTime;
+    });
+
+    return {
+      videos: normalizedVideos,
+      profileInfo: userInfo,
+      diagnostics: {
+        source: 'http_embedded',
+        iterations: 0,
+        fetched_batches: 0,
+        fetched_items: normalizedVideos.length,
+        has_more: false,
+        last_cursor: null,
+        total_video_count: totalVideoCount
+      }
+    };
+  }
+
+  // If we need more videos, try API calls (though they may return empty)
   let cursor = '0';
   let hasMore = true;
   let iterations = 0;
 
-  const targetItems = Math.max(pageNum * perPageNum, perPageNum);
   const desiredTotal =
     typeof totalVideoCount === 'number'
       ? totalVideoCount
