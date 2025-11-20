@@ -256,6 +256,12 @@ function getCookies(req) {
     });
   }
 
+  // Debug: Log cookie count
+  console.log(`TikTok Cookies loaded: ${unique.length} cookies`);
+  if (unique.length > 0) {
+    console.log('Cookie names:', unique.map(c => c.name).join(', '));
+  }
+
   return unique;
 }
 
@@ -693,6 +699,10 @@ async function fetchItemListBatchHttp({ userInfo, cookieMap, cursor, count, user
   try {
     payload = JSON.parse(responseText);
   } catch (error) {
+    // Log the actual response for debugging
+    console.error('TikTok API Response (first 500 chars):', responseText.slice(0, 500));
+    console.error('Response length:', responseText.length);
+    console.error('Response headers:', Object.fromEntries(response.headers.entries()));
     const parseError = new Error('Unable to parse TikTok item list response JSON');
     parseError.code = 'ITEM_LIST_PARSE_ERROR';
     parseError.cause = error;
