@@ -856,11 +856,14 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
   let hasMore = true;
   let iterations = 0;
   let apiSuccessCount = 0;
+  let consecutiveEmptyResponses = 0;
 
-  // Limit API attempts to avoid wasting time on failed calls
-  const maxApiAttempts = Math.min(HTTP_ITEM_LIST_MAX_PAGES, 3);
+  const desiredTotal =
+    typeof totalVideoCount === 'number'
+      ? totalVideoCount
+      : targetItems + HTTP_ITEM_LIST_PAGE_SIZE * HTTP_ITEM_LIST_BUFFER_PAGES;
 
-  while (hasMore && iterations < maxApiAttempts && aggregatedRawVideos.length < targetItems) {
+  while (hasMore && iterations < HTTP_ITEM_LIST_MAX_PAGES) {
     try {
       const batch = await fetchItemListBatchHttp({
         userInfo,
@@ -873,9 +876,17 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
       if (batch.items.length > 0) {
         aggregatedRawVideos.push(...batch.items);
         apiSuccessCount++;
-        console.log(`[API Supplement] ✓ Batch ${iterations + 1}: fetched ${batch.items.length} items`);
+        consecutiveEmptyResponses = 0; // Reset counter on success
+        console.log(`[API Supplement] ✓ Batch ${iterations + 1}: fetched ${batch.items.length} items (total: ${aggregatedRawVideos.length})`);
       } else {
-        console.log(`[API Supplement] ✗ Batch ${iterations + 1}: empty response`);
+        consecutiveEmptyResponses++;
+        console.log(`[API Supplement] ✗ Batch ${iterations + 1}: empty response (${consecutiveEmptyResponses} consecutive)`);
+
+        // Stop after 3 consecutive empty responses (API is blocked)
+        if (consecutiveEmptyResponses >= 3) {
+          console.log(`[API Supplement] Stopping - 3 consecutive empty responses, API appears blocked`);
+          break;
+        }
       }
 
       hasMore = batch.hasMore;
@@ -888,16 +899,27 @@ async function fetchVideosViaHttp({ username, cookies, pageNum, perPageNum, star
         break;
       }
 
-      // Stop if we have enough
-      if (aggregatedRawVideos.length >= targetItems) {
-        console.log(`[API Supplement] ✓ Target reached: ${aggregatedRawVideos.length}/${targetItems}`);
+      // Stop if we have enough for current request
+      if (aggregatedRawVideos.length >= desiredTotal) {
+        console.log(`[API Supplement] ✓ Desired total reached: ${aggregatedRawVideos.length}/${desiredTotal}`);
+        break;
+      }
+
+      // Stop if we've reached the profile's total video count
+      if (typeof totalVideoCount === 'number' && aggregatedRawVideos.length >= totalVideoCount) {
+        console.log(`[API Supplement] ✓ All profile videos fetched: ${aggregatedRawVideos.length}/${totalVideoCount}`);
         break;
       }
 
     } catch (error) {
       console.warn(`[API Supplement] Batch ${iterations + 1} failed:`, error.message);
+      consecutiveEmptyResponses++;
       // Don't throw - we have embedded videos as fallback
-      break;
+      // Stop after 3 consecutive failures
+      if (consecutiveEmptyResponses >= 3) {
+        console.log(`[API Supplement] Stopping - 3 consecutive failures`);
+        break;
+      }
     }
   }
 
