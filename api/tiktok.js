@@ -1389,19 +1389,36 @@ async function collectVideoData(page, username, options = {}) {
 
   await page
     .goto(`https://www.tiktok.com/@${username}`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle2',
       timeout: NAVIGATION_TIMEOUT_MS
     })
     .catch(() => {
       // Continue even if navigation times out; partial content may still be available
     });
 
+  // CRITICAL: Wait for TikTok's JavaScript to populate __UNIVERSAL_DATA_FOR_REHYDRATION__
+  console.log('[TikTok Browser] Waiting for __UNIVERSAL_DATA_FOR_REHYDRATION__ to populate...');
+  try {
+    await page.waitForFunction(
+      () => {
+        return window.__UNIVERSAL_DATA_FOR_REHYDRATION__ &&
+               window.__UNIVERSAL_DATA_FOR_REHYDRATION__.__DEFAULT_SCOPE__ &&
+               window.__UNIVERSAL_DATA_FOR_REHYDRATION__.__DEFAULT_SCOPE__['webapp.user-detail'];
+      },
+      { timeout: 15000 }
+    );
+    console.log('[TikTok Browser] ✓ __UNIVERSAL_DATA_FOR_REHYDRATION__ loaded');
+  } catch {
+    console.warn('[TikTok Browser] ⚠️ __UNIVERSAL_DATA_FOR_REHYDRATION__ did not load in time');
+  }
+
   try {
     await page.waitForSelector('[data-e2e="user-post-item"]', {
-      timeout: Math.max(2000, NAVIGATION_TIMEOUT_MS / 2)
+      timeout: Math.max(5000, NAVIGATION_TIMEOUT_MS / 2)
     });
+    console.log('[TikTok Browser] ✓ Post items visible');
   } catch {
-    // proceed even if posts are not immediately visible
+    console.warn('[TikTok Browser] ⚠️ Post items not visible');
   }
 
   await delay(CONTENT_WAIT_MS);
