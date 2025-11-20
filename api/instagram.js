@@ -358,31 +358,70 @@ function buildApiRequestHeaders({ cookieHeader, referer } = {}) {
   return headers;
 }
 
-function extractSharedDataFromHtml(html) {
-  if (typeof html !== 'string' || !html.includes('window._sharedData')) {
-    throw new Error('Instagram profile page did not contain expected shared data script');
+// ✅ NEW: Extract data from Instagram's current JSON structure
+function extractDataFromHtml(html) {
+  // Instagram now uses embedded JSON in script tags with type="application/json"
+  // or exposes data via different global variables
+
+  // Try multiple patterns Instagram uses
+  const patterns = [
+    // Pattern 1: application/ld+json
+    /<script type="application\/ld\+json">({.*?})<\/script>/gs,
+    // Pattern 2: Newer embedded data format
+    /<script type="application\/json" data-content-len="\d+">({.*?})<\/script>/gs,
+    // Pattern 3: Window object assignments
+    /window\.__additionalDataLoaded\('.*?',({.*?})\);/gs,
+  ];
+
+  for (const pattern of patterns) {
+    const matches = html.match(pattern);
+    if (matches && matches.length > 0) {
+      try {
+        // Try to parse each match
+        for (const match of matches) {
+          const jsonMatch = match.match(/{.*}/s);
+          if (jsonMatch) {
+            const data = JSON.parse(jsonMatch[0]);
+            if (data) {
+              console.log('[Instagram] Found embedded data structure');
+              return data;
+            }
+          }
+        }
+      } catch (e) {
+        // Continue to next pattern
+        continue;
+      }
+    }
   }
-  const marker = 'window._sharedData = ';
-  const start = html.indexOf(marker);
-  if (start === -1) {
-    throw new Error('Unable to locate shared data in Instagram profile page');
-  }
-  const end = html.indexOf(';</script>', start);
-  if (end === -1) {
-    throw new Error('Incomplete shared data payload detected on Instagram profile page');
-  }
-  const payload = html.slice(start + marker.length, end);
-  return JSON.parse(payload);
+
+  console.warn('[Instagram] Could not find embedded data in HTML, will use browser scraping');
+  return null;
 }
 
-function extractUserInfoFromSharedData(sharedData, username) {
-  const userInfo =
-    sharedData?.entry_data?.ProfilePage?.[0]?.graphql?.user ||
-    sharedData?.entry_data?.ProfilePage?.[0]?.user;
-  if (!userInfo?.id) {
-    throw new Error(`Unable to resolve user information for ${username}`);
+function extractUserInfoFromData(data, username) {
+  // Try to extract user info from various possible structures
+  if (!data) {
+    return null;
   }
-  return userInfo;
+
+  // Try different paths where Instagram might store user data
+  const possiblePaths = [
+    data?.graphql?.user,
+    data?.entry_data?.ProfilePage?.[0]?.graphql?.user,
+    data?.entry_data?.ProfilePage?.[0]?.user,
+    data?.user,
+  ];
+
+  for (const userInfo of possiblePaths) {
+    if (userInfo?.id || userInfo?.pk) {
+      console.log('[Instagram] Found user info');
+      return userInfo;
+    }
+  }
+
+  console.warn(`[Instagram] Could not extract user info for ${username} from data`);
+  return null;
 }
 
 function getClientIdentifier(req) {
@@ -593,13 +632,23 @@ async function fetchProfileMetadataHttp({ username, cookieMap }) {
     }
 
     try {
-      const sharedData = extractSharedDataFromHtml(html);
-      const userInfo = extractUserInfoFromSharedData(sharedData, username);
-      return { userInfo, html };
+      const embeddedData = extractDataFromHtml(html);
+      const userInfo = extractUserInfoFromData(embeddedData, username);
+
+      // If we got user info, return it
+      if (userInfo) {
+        return { userInfo, html, embeddedData };
+      }
+
+      // If no user info found, we'll need browser scraping
+      console.warn('[Instagram HTTP] No user info found in HTML, browser scraping will be required');
+      return { userInfo: null, html, embeddedData };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt >= 2) {
-        throw lastError;
+        // Don't throw, return null to trigger browser fallback
+        console.warn('[Instagram HTTP] Failed to parse HTML:', error.message);
+        return { userInfo: null, html: null, embeddedData: null };
       }
     }
   }
@@ -836,6 +885,7 @@ function filterPostsByEpoch(posts, startEpoch, endEpoch) {
   });
 }
 
+// ✅ NEW: Modern DOM-based scraping (Instagram 2025 structure)
 async function collectPostDataViaBrowser(page, username, options = {}) {
   const {
     targetItems = 50,
@@ -843,64 +893,124 @@ async function collectPostDataViaBrowser(page, username, options = {}) {
     endEpoch = null
   } = options;
 
+  console.log(`[Instagram Browser] Navigating to profile: ${username}`);
+
   await page
     .goto(`https://www.instagram.com/${username}/`, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'domcontentloaded',
       timeout: NAVIGATION_TIMEOUT_MS
     })
     .catch(() => {});
 
   await delay(CONTENT_WAIT_MS);
 
-  let posts = [];
+  // Try to extract user info from page
   let profileInfo = null;
-
   try {
-    const extractedData = await page.evaluate(() => {
-      const sharedData = window._sharedData;
-      const userData = sharedData?.entry_data?.ProfilePage?.[0]?.graphql?.user;
+    profileInfo = await page.evaluate(() => {
+      // Try various ways to get profile data
+      const metaContent = document.querySelector('meta[property="og:description"]')?.content || '';
+      const usernameMatch = metaContent.match(/(@[\w.]+)/);
+      const followersMatch = metaContent.match(/([\d,]+)\s+Followers/);
+      const postsMatch = metaContent.match(/([\d,]+)\s+Posts/);
 
-      if (!userData) {
-        return { posts: [], profileInfo: null };
-      }
-
-      const edges = userData.edge_owner_to_timeline_media?.edges || [];
       return {
-        posts: edges,
-        profileInfo: userData
+        username: usernameMatch ? usernameMatch[1].replace('@', '') : null,
+        follower_count: followersMatch ? parseInt(followersMatch[1].replace(/,/g, ''), 10) : null,
+        media_count: postsMatch ? parseInt(postsMatch[1].replace(/,/g, ''), 10) : null
       };
     });
+    console.log('[Instagram Browser] Extracted profile info:', profileInfo);
+  } catch (error) {
+    console.warn('[Instagram Browser] Could not extract profile info:', error.message);
+  }
 
-    posts = extractedData.posts;
-    profileInfo = extractedData.profileInfo;
+  // Scrape posts from DOM
+  let posts = [];
+  let scrollAttempts = 0;
+  const maxScrolls = 10;
 
-    let scrollAttempts = 0;
-    const maxScrolls = 10;
+  console.log(`[Instagram Browser] Scraping posts (target: ${targetItems})...`);
 
-    while (posts.length < targetItems && scrollAttempts < maxScrolls) {
+  while (posts.length < targetItems && scrollAttempts < maxScrolls) {
+    try {
+      const newPosts = await page.evaluate(() => {
+        const postElements = document.querySelectorAll('article a[href*="/p/"], article a[href*="/reel/"]');
+        const postsData = [];
+
+        postElements.forEach((link) => {
+          const href = link.getAttribute('href');
+          if (!href) return;
+
+          // Extract post shortcode from URL
+          const match = href.match(/\/(p|reel)\/([A-Za-z0-9_-]+)/);
+          if (!match) return;
+
+          const shortcode = match[2];
+
+          // Try to find image and caption
+          const article = link.closest('article');
+          const img = link.querySelector('img');
+          const caption = img?.getAttribute('alt') || '';
+
+          // Try to extract engagement from nearby elements
+          const likeElement = article?.querySelector('[aria-label*="like"]');
+          const commentElement = article?.querySelector('[aria-label*="comment"]');
+
+          postsData.push({
+            shortcode,
+            url: `https://www.instagram.com${href}`,
+            caption: caption || null,
+            display_url: img?.src || null,
+            // Note: Likes/comments may not be visible without scrolling into view
+            edge_liked_by: { count: null },
+            edge_media_to_comment: { count: null },
+            taken_at_timestamp: null // Not available from DOM without API
+          });
+        });
+
+        return postsData;
+      });
+
+      // Deduplicate posts
+      const existingShortcodes = new Set(posts.map(p => p.shortcode));
+      const uniqueNewPosts = newPosts.filter(p => !existingShortcodes.has(p.shortcode));
+
+      if (uniqueNewPosts.length > 0) {
+        posts.push(...uniqueNewPosts);
+        console.log(`[Instagram Browser] Found ${posts.length} posts so far...`);
+      }
+
+      // Check if we have enough
+      if (posts.length >= targetItems) {
+        break;
+      }
+
+      // Scroll to load more
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
 
       await delay(2000);
 
-      const newData = await page.evaluate(() => {
-        const sharedData = window._sharedData;
-        const userData = sharedData?.entry_data?.ProfilePage?.[0]?.graphql?.user;
-        const edges = userData?.edge_owner_to_timeline_media?.edges || [];
-        return edges;
+      // Check if new posts loaded
+      const currentPostCount = await page.evaluate(() => {
+        return document.querySelectorAll('article a[href*="/p/"], article a[href*="/reel/"]').length;
       });
 
-      if (newData.length === posts.length) {
+      if (currentPostCount === existingShortcodes.size) {
+        console.log('[Instagram Browser] No more posts loading, stopping');
         break;
       }
 
-      posts = newData;
       scrollAttempts++;
+    } catch (error) {
+      console.warn('[Instagram Browser] Error during scraping:', error.message);
+      break;
     }
-  } catch (error) {
-    console.warn('Failed to extract Instagram posts via browser:', error);
   }
+
+  console.log(`[Instagram Browser] Scraped ${posts.length} posts after ${scrollAttempts} scroll attempts`);
 
   return { posts, profileInfo };
 }

@@ -1663,18 +1663,77 @@ export default async function handler(req, res) {
     let fetchContext = null;
     let httpError = null;
 
-    try {
-      fetchContext = await fetchVideosViaHttp({
-        username,
-        cookies,
-        pageNum,
-        perPageNum,
-        startEpoch,
-        endEpoch
-      });
-    } catch (error) {
-      httpError = error instanceof Error ? error : new Error(String(error));
-      console.warn('Primary HTTP fetch failed, attempting browser fallback:', httpError);
+    const targetCount = Math.max(pageNum * perPageNum, perPageNum);
+    const useBrowserPrimary = targetCount > 30; // Use browser for >30 videos to get ALL videos
+
+    if (useBrowserPrimary) {
+      console.log(`[TikTok Strategy] Target ${targetCount} videos > 30 - using BROWSER PRIMARY (can fetch ALL videos with X-Bogus)`);
+    } else {
+      console.log(`[TikTok Strategy] Target ${targetCount} videos ≤ 30 - using HTTP PRIMARY (fast embedded videos)`);
+    }
+
+    // Strategy 1: Use BROWSER first if we need more than 30 videos
+    if (useBrowserPrimary) {
+      try {
+        console.log('[TikTok] Launching browser to fetch ALL videos using TikTok\'s JavaScript (auto X-Bogus)...');
+        browser = await createBrowser();
+        page = await browser.newPage();
+        page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
+
+        await preparePage(page, cookies);
+
+        const { videos: rawVideos, profileInfo } = await collectVideoData(page, username, {
+          targetItems: targetCount,
+          pageSize: HTTP_ITEM_LIST_PAGE_SIZE,
+          maxPages: HTTP_ITEM_LIST_MAX_PAGES,
+          startEpoch,
+          endEpoch
+        });
+
+        const normalizedVideos = normalizeVideos(rawVideos, username);
+        normalizedVideos.sort((a, b) => {
+          const aTime = typeof a.epoch_time_posted === 'number' ? a.epoch_time_posted : 0;
+          const bTime = typeof b.epoch_time_posted === 'number' ? b.epoch_time_posted : 0;
+          return bTime - aTime;
+        });
+
+        fetchContext = {
+          videos: normalizedVideos,
+          profileInfo: profileInfo ?? null,
+          diagnostics: {
+            source: 'browser_primary',
+            browser_reason: 'Target > 30 videos, browser can fetch ALL with auto X-Bogus'
+          }
+        };
+
+        // Close browser early
+        if (page) await page.close().catch(() => {});
+        if (browser) await browser.close().catch(() => {});
+        page = null;
+        browser = null;
+
+        console.log(`[TikTok] Browser fetch complete: ${normalizedVideos.length} videos`);
+      } catch (browserError) {
+        console.warn('[TikTok] Browser primary fetch failed, falling back to HTTP:', browserError.message);
+        httpError = browserError;
+      }
+    }
+
+    // Strategy 2: Use HTTP if browser wasn't used or failed
+    if (!fetchContext) {
+      try {
+        fetchContext = await fetchVideosViaHttp({
+          username,
+          cookies,
+          pageNum,
+          perPageNum,
+          startEpoch,
+          endEpoch
+        });
+      } catch (error) {
+        httpError = error instanceof Error ? error : new Error(String(error));
+        console.warn('HTTP fetch failed, attempting browser fallback:', httpError);
+      }
     }
 
     if (httpError?.code === 'PROFILE_NOT_FOUND') {
@@ -1685,6 +1744,7 @@ export default async function handler(req, res) {
       });
     }
 
+    // Strategy 3: Final fallback to browser if HTTP also failed
     if (!fetchContext) {
       browser = await createBrowser();
       page = await browser.newPage();
