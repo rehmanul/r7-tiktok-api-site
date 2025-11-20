@@ -1,11 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎥 Social Media API - Multi-Platform Scraper</title>
+    <title>Social Media API - Professional Multi-Platform Scraper</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1e293b;
+            --light: #f8fafc;
+            --tiktok: #fe2c55;
+            --instagram: #e4405f;
+            --youtube: #ff0000;
+            --twitter: #1da1f2;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,150 +27,336 @@
         }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
             min-height: 100vh;
             padding: 20px;
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
-        h1 {
+        /* Header Section */
+        .header {
             text-align: center;
-            font-size: 2.5rem;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.6s ease;
+        }
+
+        .header h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            letter-spacing: -1px;
         }
 
-        .subtitle {
-            text-align: center;
-            font-size: 1.2rem;
-            margin-bottom: 30px;
-            opacity: 0.9;
+        .header .subtitle {
+            font-size: clamp(1rem, 2.5vw, 1.3rem);
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 300;
         }
 
-        .platform-tabs {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-        }
-
-        .platform-tab {
-            padding: 12px 30px;
+        .header .api-badge {
+            display: inline-block;
             background: rgba(255, 255, 255, 0.2);
-            border: 2px solid transparent;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .platform-tab:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .platform-tab.active {
-            background: rgba(255, 255, 255, 0.4);
-            border-color: #fff;
-        }
-
-        .search-box {
-            background: rgba(255, 255, 255, 0.1);
-            -webkit-backdrop-filter: blur(10px);
+            padding: 8px 20px;
+            border-radius: 50px;
+            margin-top: 15px;
             backdrop-filter: blur(10px);
-            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Platform Selector */
+        .platform-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+            animation: fadeInUp 0.6s ease 0.2s both;
+        }
+
+        .platform-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border: 2px solid transparent;
+            border-radius: 20px;
             padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .platform-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .platform-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .platform-card:hover::before {
+            opacity: 1;
+        }
+
+        .platform-card.active {
+            border-color: white;
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.05);
+        }
+
+        .platform-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .platform-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .platform-desc {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Main Content Card */
+        .main-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(30px);
+            border-radius: 25px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: fadeInUp 0.6s ease 0.4s both;
+        }
+
+        /* Form Styling */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            position: relative;
         }
 
-        label {
+        .form-group label {
             display: block;
-            margin-bottom: 8px;
             font-weight: 600;
-        }
-
-        input {
-            width: 100%;
-            padding: 12px 15px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            background: rgba(255, 255, 255, 0.9);
-            color: #333;
-        }
-
-        button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--dark);
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: white;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            flex: 1;
+            min-width: 200px;
+            padding: 18px 32px;
             border: none;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: 600;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        button:hover {
-            transform: scale(1.02);
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
         }
 
-        button:disabled {
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
 
-        .results {
+        .btn .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Results Section */
+        .results-section {
+            margin-top: 40px;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        .meta-info {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
-            margin-top: 30px;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: white;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .meta-label {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 25px;
         }
 
         .content-card {
-            background: rgba(255, 255, 255, 0.1);
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 25px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(255, 255, 255, 0.1);
         }
 
         .content-card:hover {
             transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .content-card a {
-            color: #fff;
-            text-decoration: none;
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .content-id {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
             font-weight: 600;
-            display: block;
-            margin-bottom: 10px;
+        }
+
+        .content-link {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .content-link:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        .content-text {
+            color: white;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            font-size: 0.95rem;
         }
 
         .content-stats {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-            flex-wrap: wrap;
-            gap: 10px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 12px;
+            padding-top: 20px;
+            border-top: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .stat {
@@ -164,115 +364,369 @@
         }
 
         .stat-value {
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: white;
+            display: block;
+            margin-bottom: 4px;
         }
 
         .stat-label {
-            font-size: 0.8rem;
-            opacity: 0.8;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
         }
 
-        .loading {
+        /* Loading State */
+        .loading-container {
             text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Error State */
+        .error-container {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid rgba(239, 68, 68, 0.5);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .error-icon {
+            font-size: 3rem;
+            color: #fca5a5;
+            margin-bottom: 15px;
+        }
+
+        .error-title {
             font-size: 1.5rem;
-            padding: 40px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 10px;
         }
 
-        .error {
-            background: rgba(255, 0, 0, 0.2);
-            border: 2px solid rgba(255, 0, 0, 0.5);
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            text-align: center;
-        }
-
-        .meta-info {
-            background: rgba(255, 255, 255, 0.1);
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 20px;
+        .error-message {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.9);
             margin-bottom: 20px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 20px;
+        }
+
+        .empty-text {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 10px;
+            }
+
+            .main-card {
+                padding: 25px;
+            }
+
+            .platform-selector {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                min-width: 100%;
+            }
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px 12px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .pagination button {
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination .page-info {
+            font-size: 1rem;
+            color: white;
+            font-weight: 600;
         }
     </style>
 </head>
-
 <body>
     <div class="container">
-        <h1>🎥 Social Media API Scraper</h1>
-        <p class="subtitle">Fetch content from TikTok, Instagram, YouTube & Twitter</p>
-
-        <div class="platform-tabs">
-            <button class="platform-tab active" data-platform="tiktok">TikTok</button>
-            <button class="platform-tab" data-platform="instagram">Instagram</button>
-            <button class="platform-tab" data-platform="youtube">YouTube</button>
-            <button class="platform-tab" data-platform="twitter">Twitter</button>
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-rocket"></i> Social Media API</h1>
+            <p class="subtitle">Professional Multi-Platform Content Scraper</p>
+            <div class="api-badge">
+                <i class="fas fa-shield-alt"></i> Production Ready API
+            </div>
         </div>
 
-        <div class="search-box">
+        <!-- Platform Selector -->
+        <div class="platform-selector">
+            <div class="platform-card active" data-platform="tiktok">
+                <span class="platform-icon">🎵</span>
+                <div class="platform-name">TikTok</div>
+                <div class="platform-desc">Short Videos & Trends</div>
+            </div>
+            <div class="platform-card" data-platform="instagram">
+                <span class="platform-icon">📸</span>
+                <div class="platform-name">Instagram</div>
+                <div class="platform-desc">Photos & Stories</div>
+            </div>
+            <div class="platform-card" data-platform="youtube">
+                <span class="platform-icon">🎬</span>
+                <div class="platform-name">YouTube</div>
+                <div class="platform-desc">Video Content</div>
+            </div>
+            <div class="platform-card" data-platform="twitter">
+                <span class="platform-icon">🐦</span>
+                <div class="platform-name">Twitter/X</div>
+                <div class="platform-desc">Tweets & Threads</div>
+            </div>
+        </div>
+
+        <!-- Main Content Card -->
+        <div class="main-card">
             <form id="searchForm">
-                <div class="form-group">
-                    <label for="username" id="usernameLabel">Username (without @)</label>
-                    <input type="text" id="username" placeholder="e.g., techreviews" required>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label id="usernameLabel">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <input type="text" id="username" placeholder="Enter username..." required>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-file-alt"></i> Page Number
+                        </label>
+                        <input type="number" id="page" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-list"></i> Items Per Page
+                        </label>
+                        <input type="number" id="perPage" value="10" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label class="tooltip">
+                            <i class="fas fa-key"></i> API Key
+                            <span class="tooltiptext">Default: admin or darkcampaign</span>
+                        </label>
+                        <input type="password" id="apiKey" placeholder="Enter API key..." required>
+                    </div>
                 </div>
-
-                <div class="form-group">
-                    <label for="page">Page Number</label>
-                    <input type="number" id="page" value="1" min="1">
+                <div class="action-buttons">
+                    <button type="submit" class="btn btn-primary" id="fetchBtn">
+                        <i class="fas fa-search"></i>
+                        <span>Fetch Content</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="exportBtn" style="display: none;">
+                        <i class="fas fa-download"></i>
+                        <span>Export JSON</span>
+                    </button>
                 </div>
-
-                <div class="form-group">
-                    <label for="perPage">Items Per Page</label>
-                    <input type="number" id="perPage" value="10" min="1" max="100">
-                </div>
-
-                <div class="form-group">
-                    <label for="apiKey">API Key</label>
-                    <input type="password" id="apiKey" placeholder="Enter your API key" required>
-                </div>
-
-                <button type="submit" id="submitBtn">🔍 Fetch Content</button>
             </form>
         </div>
 
-        <div id="metaInfo"></div>
-        <div id="results" class="results"></div>
+        <!-- Results Section -->
+        <div id="resultsSection" style="display: none;">
+            <div class="results-section">
+                <!-- Meta Info -->
+                <div id="metaInfo"></div>
+
+                <!-- Pagination Top -->
+                <div id="paginationTop" class="pagination"></div>
+
+                <!-- Results Grid -->
+                <div id="results" class="results-grid"></div>
+
+                <!-- Pagination Bottom -->
+                <div id="paginationBottom" class="pagination"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         let currentPlatform = 'tiktok';
+        let currentData = null;
+        let currentMeta = null;
+
         const form = document.getElementById('searchForm');
+        const resultsSection = document.getElementById('resultsSection');
         const resultsDiv = document.getElementById('results');
         const metaInfoDiv = document.getElementById('metaInfo');
-        const submitBtn = document.getElementById('submitBtn');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const exportBtn = document.getElementById('exportBtn');
         const usernameLabel = document.getElementById('usernameLabel');
         const usernameInput = document.getElementById('username');
 
+        // Platform configuration
+        const platformConfig = {
+            tiktok: {
+                icon: '🎵',
+                label: 'TikTok Username',
+                placeholder: 'e.g., khaby.lame',
+                endpoint: 'username'
+            },
+            instagram: {
+                icon: '📸',
+                label: 'Instagram Username',
+                placeholder: 'e.g., cristiano',
+                endpoint: 'username'
+            },
+            youtube: {
+                icon: '🎬',
+                label: 'YouTube Channel (with @)',
+                placeholder: 'e.g., @MrBeast',
+                endpoint: 'channel'
+            },
+            twitter: {
+                icon: '🐦',
+                label: 'Twitter/X Username',
+                placeholder: 'e.g., elonmusk',
+                endpoint: 'username'
+            }
+        };
+
         // Platform tabs
-        document.querySelectorAll('.platform-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                currentPlatform = tab.dataset.platform;
+        document.querySelectorAll('.platform-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                currentPlatform = card.dataset.platform;
                 updatePlaceholders();
             });
         });
 
         function updatePlaceholders() {
-            const placeholders = {
-                tiktok: { label: 'TikTok Username (without @)', placeholder: 'e.g., techreviews' },
-                instagram: { label: 'Instagram Username (without @)', placeholder: 'e.g., natgeo' },
-                youtube: { label: 'YouTube Channel Handle (with @)', placeholder: 'e.g., @MrBeast' },
-                twitter: { label: 'Twitter/X Username (without @)', placeholder: 'e.g., elonmusk' }
-            };
-
-            const config = placeholders[currentPlatform];
-            usernameLabel.textContent = config.label;
+            const config = platformConfig[currentPlatform];
+            usernameLabel.innerHTML = `<i class="fas fa-user"></i> ${config.label}`;
             usernameInput.placeholder = config.placeholder;
         }
 
+        // Form submission
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -281,25 +735,17 @@
             const perPage = document.getElementById('perPage').value;
             const apiKey = document.getElementById('apiKey').value.trim();
 
-            if (!username) {
-                alert('Please enter a username');
+            if (!username || !apiKey) {
+                showError('Please fill in all required fields');
                 return;
             }
 
-            if (!apiKey) {
-                alert('Please enter an API key');
-                return;
-            }
-
-            // Show loading
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Loading...';
-            resultsDiv.innerHTML = '<div class="loading">Fetching content...</div>';
-            metaInfoDiv.innerHTML = '';
+            showLoading();
 
             try {
-                const endpoint = currentPlatform === 'youtube' ? 'channel' : 'username';
-                const url = `/api/${currentPlatform}?${endpoint}=${encodeURIComponent(username)}&page=${page}&per-page=${perPage}&apiKey=${encodeURIComponent(apiKey)}`;
+                const config = platformConfig[currentPlatform];
+                const url = `/api/${currentPlatform}?${config.endpoint}=${encodeURIComponent(username)}&page=${page}&per-page=${perPage}&apiKey=${encodeURIComponent(apiKey)}`;
+
                 const response = await fetch(url);
                 const data = await response.json();
 
@@ -307,38 +753,117 @@
                     throw new Error(data.error || 'Failed to fetch content');
                 }
 
-                // Display meta information
-                if (data.meta) {
-                    const identifier = data.meta.username || data.meta.channel || username;
-                    const totalLabel = getTotalLabel(currentPlatform);
-                    metaInfoDiv.innerHTML = `
-                        <div class="meta-info">
-                            <h3>📊 Results for @${identifier}</h3>
-                            <p>Page ${data.meta.page} of ${data.meta.total_pages} | Total ${totalLabel}: ${data.meta.total_posts || data.meta.total_videos || data.meta.total_tweets || 0}</p>
-                            <p>Fetch Method: ${data.meta.fetch_method || 'N/A'}</p>
-                        </div>
-                    `;
-                }
+                currentData = data.data;
+                currentMeta = data.meta;
 
-                // Display content
-                if (data.data && data.data.length > 0) {
-                    resultsDiv.innerHTML = data.data.map(item => renderContentCard(item, currentPlatform)).join('');
-                } else {
-                    resultsDiv.innerHTML = '<div class="loading">No content found</div>';
-                }
-
+                displayResults(data);
             } catch (error) {
-                resultsDiv.innerHTML = `
-                    <div class="error">
-                        <h3>❌ Error</h3>
-                        <p>${error.message}</p>
-                    </div>
-                `;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '🔍 Fetch Content';
+                showError(error.message);
             }
         });
+
+        function showLoading() {
+            resultsSection.style.display = 'block';
+            resultsDiv.innerHTML = `
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Fetching content from ${currentPlatform}...</div>
+                </div>
+            `;
+            metaInfoDiv.innerHTML = '';
+            exportBtn.style.display = 'none';
+            fetchBtn.innerHTML = '<div class="spinner"></div><span>Loading...</span>';
+            fetchBtn.disabled = true;
+        }
+
+        function showError(message) {
+            resultsSection.style.display = 'block';
+            resultsDiv.innerHTML = `
+                <div class="error-container">
+                    <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="error-title">Error</div>
+                    <div class="error-message">${message}</div>
+                </div>
+            `;
+            metaInfoDiv.innerHTML = '';
+            exportBtn.style.display = 'none';
+            fetchBtn.innerHTML = '<i class="fas fa-search"></i><span>Fetch Content</span>';
+            fetchBtn.disabled = false;
+        }
+
+        function displayResults(data) {
+            fetchBtn.innerHTML = '<i class="fas fa-search"></i><span>Fetch Content</span>';
+            fetchBtn.disabled = false;
+
+            // Display meta info
+            if (data.meta) {
+                const identifier = data.meta.username || data.meta.channel || 'User';
+                const totalLabel = getTotalLabel(currentPlatform);
+                const totalCount = data.meta.total_posts || data.meta.total_videos || data.meta.total_tweets || 0;
+
+                metaInfoDiv.innerHTML = `
+                    <div class="meta-info">
+                        <div class="meta-item">
+                            <span class="meta-value">${platformConfig[currentPlatform].icon}</span>
+                            <span class="meta-label">@${identifier}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-value">${data.meta.page}</span>
+                            <span class="meta-label">Current Page</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-value">${data.meta.total_pages}</span>
+                            <span class="meta-label">Total Pages</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-value">${totalCount}</span>
+                            <span class="meta-label">${totalLabel}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-value">${data.meta.fetch_method || 'HTTP'}</span>
+                            <span class="meta-label">Fetch Method</span>
+                        </div>
+                    </div>
+                `;
+
+                // Show pagination
+                renderPagination(data.meta);
+            }
+
+            // Display content
+            if (data.data && data.data.length > 0) {
+                resultsDiv.innerHTML = data.data.map(item => renderContentCard(item, currentPlatform)).join('');
+                exportBtn.style.display = 'flex';
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-inbox"></i></div>
+                        <div class="empty-text">No content found</div>
+                    </div>
+                `;
+                exportBtn.style.display = 'none';
+            }
+        }
+
+        function renderPagination(meta) {
+            const paginationHTML = `
+                <button ${meta.page <= 1 ? 'disabled' : ''} onclick="changePage(${meta.page - 1})">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <span class="page-info">Page ${meta.page} of ${meta.total_pages}</span>
+                <button ${meta.page >= meta.total_pages ? 'disabled' : ''} onclick="changePage(${meta.page + 1})">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            `;
+            document.getElementById('paginationTop').innerHTML = paginationHTML;
+            document.getElementById('paginationBottom').innerHTML = paginationHTML;
+        }
+
+        function changePage(newPage) {
+            document.getElementById('page').value = newPage;
+            form.dispatchEvent(new Event('submit'));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
         function getTotalLabel(platform) {
             const labels = {
@@ -360,79 +885,82 @@
             if (platform === 'tiktok') {
                 statsHTML = `
                     <div class="stat">
-                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
-                        <div class="stat-label">Likes</div>
+                        <span class="stat-value">❤️ ${formatNumber(item.likes)}</span>
+                        <span class="stat-label">Likes</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
-                        <div class="stat-label">Views</div>
+                        <span class="stat-value">👁️ ${formatNumber(item.views)}</span>
+                        <span class="stat-label">Views</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
-                        <div class="stat-label">Comments</div>
+                        <span class="stat-value">💬 ${formatNumber(item.comments)}</span>
+                        <span class="stat-label">Comments</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">🔁 ${formatNumber(item.shares)}</div>
-                        <div class="stat-label">Shares</div>
+                        <span class="stat-value">🔁 ${formatNumber(item.shares)}</span>
+                        <span class="stat-label">Shares</span>
                     </div>
                 `;
             } else if (platform === 'instagram') {
                 statsHTML = `
                     <div class="stat">
-                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
-                        <div class="stat-label">Likes</div>
+                        <span class="stat-value">❤️ ${formatNumber(item.likes)}</span>
+                        <span class="stat-label">Likes</span>
                     </div>
                     <div class="stat">
-                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
-                        <div class="stat-label">Comments</div>
+                        <span class="stat-value">💬 ${formatNumber(item.comments)}</span>
+                        <span class="stat-label">Comments</span>
                     </div>
                     ${item.views ? `<div class="stat">
-                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
-                        <div class="stat-label">Views</div>
+                        <span class="stat-value">👁️ ${formatNumber(item.views)}</span>
+                        <span class="stat-label">Views</span>
                     </div>` : ''}
                 `;
             } else if (platform === 'youtube') {
                 statsHTML = `
                     ${item.views ? `<div class="stat">
-                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
-                        <div class="stat-label">Views</div>
+                        <span class="stat-value">👁️ ${formatNumber(item.views)}</span>
+                        <span class="stat-label">Views</span>
                     </div>` : ''}
                     ${item.likes ? `<div class="stat">
-                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
-                        <div class="stat-label">Likes</div>
+                        <span class="stat-value">❤️ ${formatNumber(item.likes)}</span>
+                        <span class="stat-label">Likes</span>
                     </div>` : ''}
                     ${item.comments ? `<div class="stat">
-                        <div class="stat-value">💬 ${formatNumber(item.comments)}</div>
-                        <div class="stat-label">Comments</div>
+                        <span class="stat-value">💬 ${formatNumber(item.comments)}</span>
+                        <span class="stat-label">Comments</span>
                     </div>` : ''}
                 `;
             } else if (platform === 'twitter') {
                 statsHTML = `
                     ${item.likes ? `<div class="stat">
-                        <div class="stat-value">❤️ ${formatNumber(item.likes)}</div>
-                        <div class="stat-label">Likes</div>
+                        <span class="stat-value">❤️ ${formatNumber(item.likes)}</span>
+                        <span class="stat-label">Likes</span>
                     </div>` : ''}
                     ${item.retweets ? `<div class="stat">
-                        <div class="stat-value">🔁 ${formatNumber(item.retweets)}</div>
-                        <div class="stat-label">Retweets</div>
+                        <span class="stat-value">🔁 ${formatNumber(item.retweets)}</span>
+                        <span class="stat-label">Retweets</span>
                     </div>` : ''}
                     ${item.replies ? `<div class="stat">
-                        <div class="stat-value">💬 ${formatNumber(item.replies)}</div>
-                        <div class="stat-label">Replies</div>
+                        <span class="stat-value">💬 ${formatNumber(item.replies)}</span>
+                        <span class="stat-label">Replies</span>
                     </div>` : ''}
                     ${item.views ? `<div class="stat">
-                        <div class="stat-value">👁️ ${formatNumber(item.views)}</div>
-                        <div class="stat-label">Views</div>
+                        <span class="stat-value">👁️ ${formatNumber(item.views)}</span>
+                        <span class="stat-label">Views</span>
                     </div>` : ''}
                 `;
             }
 
             return `
                 <div class="content-card">
-                    <a href="${url}" target="_blank">
-                        📹 ${platform.toUpperCase()} #${id}
-                    </a>
-                    <p>${text.slice(0, 200)}${text.length > 200 ? '...' : ''}</p>
+                    <div class="content-header">
+                        <div class="content-id">${platformConfig[platform].icon} #${id}</div>
+                        <a href="${url}" target="_blank" class="content-link">
+                            <i class="fas fa-external-link-alt"></i> View
+                        </a>
+                    </div>
+                    <div class="content-text">${text.slice(0, 250)}${text.length > 250 ? '...' : ''}</div>
                     <div class="content-stats">
                         ${statsHTML}
                     </div>
@@ -442,18 +970,34 @@
 
         function formatNumber(num) {
             if (!num && num !== 0) return 'N/A';
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            }
-            if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
-            }
+            if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
             return num.toString();
         }
+
+        // Export functionality
+        exportBtn.addEventListener('click', () => {
+            const exportData = {
+                platform: currentPlatform,
+                meta: currentMeta,
+                data: currentData,
+                exported_at: new Date().toISOString()
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentPlatform}_data_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
 
         // Initialize
         updatePlaceholders();
     </script>
 </body>
-
 </html>
