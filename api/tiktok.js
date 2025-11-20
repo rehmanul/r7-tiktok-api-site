@@ -1422,11 +1422,16 @@ async function collectVideoData(page, username, options = {}) {
   try {
     const expanded = await page.evaluate(
       async ({ desiredItems, fetchCount, maxFetches, minStartEpoch, maxEndEpoch }) => {
+        const logs = [];
         const scope = window.__UNIVERSAL_DATA_FOR_REHYDRATION__?.__DEFAULT_SCOPE__;
         const userInfo = scope?.['webapp.user-detail']?.userInfo ?? null;
 
+        logs.push(`[In-Page] Has scope: ${!!scope}`);
+        logs.push(`[In-Page] Has userInfo: ${!!userInfo}`);
+        logs.push(`[In-Page] Has secUid: ${!!userInfo?.user?.secUid}`);
+
         if (!userInfo?.user?.secUid) {
-          return { items: [], userInfo };
+          return { items: [], userInfo, logs };
         }
 
         const results = [];
@@ -1484,14 +1489,18 @@ async function collectVideoData(page, username, options = {}) {
           params.set('device_platform', 'web_pc');
 
           try {
+            logs.push(`[In-Page] Attempt ${iterations + 1}: Fetching with cursor=${cursor}`);
             const response = await fetch(`https://www.tiktok.com/api/post/item_list/?${params.toString()}`, {
               headers: { accept: 'application/json, text/plain, */*' }
             });
+            logs.push(`[In-Page] Response status: ${response.status}`);
             if (!response.ok) {
+              logs.push(`[In-Page] Response not OK, breaking`);
               break;
             }
             const payload = await response.json();
             const items = Array.isArray(payload?.itemList) ? payload.itemList : [];
+            logs.push(`[In-Page] Got ${items.length} items from API`);
 
             for (const item of items) {
               const identifier =
@@ -1527,12 +1536,14 @@ async function collectVideoData(page, username, options = {}) {
                 break;
               }
             }
-          } catch {
+          } catch (fetchError) {
+            logs.push(`[In-Page] Fetch error: ${fetchError.message}`);
             break;
           }
         }
 
-        return { items: results, userInfo };
+        logs.push(`[In-Page] Final: ${results.length} items collected after ${iterations} iterations`);
+        return { items: results, userInfo, logs };
       },
       {
         desiredItems: Math.max(1, targetItems),
@@ -1544,6 +1555,11 @@ async function collectVideoData(page, username, options = {}) {
     );
 
     if (expanded) {
+      // Log the in-page execution logs
+      if (Array.isArray(expanded.logs)) {
+        expanded.logs.forEach(log => console.log(log));
+      }
+
       if (Array.isArray(expanded.items) && expanded.items.length) {
         videos.push(...expanded.items);
       }
@@ -1552,9 +1568,29 @@ async function collectVideoData(page, username, options = {}) {
       }
     }
   } catch (error) {
-    console.warn('Failed to expand TikTok videos via in-page fetch:', error);
+    console.error('[TikTok Browser] Failed to expand videos via in-page fetch:', error.message);
+    console.error('[TikTok Browser] Error stack:', error.stack);
+
+    // Try to get more details from the page
+    try {
+      const pageError = await page.evaluate(() => {
+        const scope = window.__UNIVERSAL_DATA_FOR_REHYDRATION__?.__DEFAULT_SCOPE__;
+        return {
+          hasUniversalData: !!window.__UNIVERSAL_DATA_FOR_REHYDRATION__,
+          hasScope: !!scope,
+          hasUserDetail: !!scope?.['webapp.user-detail'],
+          hasUserInfo: !!scope?.['webapp.user-detail']?.userInfo,
+          hasSecUid: !!scope?.['webapp.user-detail']?.userInfo?.user?.secUid,
+          statusCode: scope?.['webapp.user-detail']?.statusCode
+        };
+      });
+      console.error('[TikTok Browser] Page state:', JSON.stringify(pageError));
+    } catch (evalError) {
+      console.error('[TikTok Browser] Could not evaluate page state:', evalError.message);
+    }
   }
 
+  console.log(`[TikTok Browser] Collected ${videos.length} videos total`);
   return { videos, profileInfo };
 }
 
